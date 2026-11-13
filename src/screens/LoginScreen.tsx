@@ -8,7 +8,7 @@ import { colors } from '../theme';
 import { Button, ErrorText, Input, ui } from '../ui';
 
 export default function LoginScreen() {
-  const { signIn, apiUrl, setApiUrl } = useAuth();
+  const { signIn, apiUrl, setApiUrl, signedOutReason } = useAuth();
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
@@ -64,6 +64,11 @@ export default function LoginScreen() {
             />
           </View>
 
+          {signedOutReason && !error ? (
+            <View style={{ backgroundColor: colors.lowBg, borderRadius: 10, padding: 12, marginBottom: 16 }}>
+              <Text style={{ color: colors.low, fontSize: 14, lineHeight: 20 }}>You were signed out. {signedOutReason}</Text>
+            </View>
+          ) : null}
           <Input label="Username" value={username} onChangeText={setUsername} autoCapitalize="none" returnKeyType="next" />
           <Input
             label="PIN"

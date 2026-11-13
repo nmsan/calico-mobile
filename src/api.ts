@@ -22,7 +22,7 @@ export class ApiError extends Error {
 type Config = {
   baseUrl: string;
   token: string | null;
-  onUnauthorized?: () => void;
+  onUnauthorized?: (reason: string) => void;
 };
 
 const config: Config = { baseUrl: '', token: null };
@@ -54,7 +54,10 @@ async function call<T>(action: string, params: Record<string, unknown> = {}): Pr
     throw new ApiError('The server did not return JSON. Check the API URL and that the web app access is set to "Anyone".', 'BAD_RESPONSE');
   }
   if (!json.ok) {
-    if (json.code === 'UNAUTHORIZED' && action !== 'login') config.onUnauthorized?.();
+    if (json.code === 'UNAUTHORIZED' && action !== 'login') {
+      console.warn(`[calico] signed out: "${action}" was rejected by the server: ${json.error}`);
+      config.onUnauthorized?.(json.error || 'Please sign in again.');
+    }
     throw new ApiError(json.error || 'Request failed', json.code);
   }
   return json.data as T;

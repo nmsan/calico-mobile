@@ -12,6 +12,8 @@ const DEFAULT_URL = process.env.EXPO_PUBLIC_API_URL ?? '';
 type AuthState = {
   ready: boolean;
   user: User | null;
+  /** Why the server ended the session, shown on the sign-in screen. */
+  signedOutReason: string | null;
   apiUrl: string;
   setApiUrl: (url: string) => Promise<void>;
   signIn: (username: string, pin: string) => Promise<void>;
@@ -24,11 +26,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [apiUrl, setApiUrlState] = useState(DEFAULT_URL);
+  const [signedOutReason, setSignedOutReason] = useState<string | null>(null);
 
-  const clearSession = useCallback(async () => {
+  const clearSession = useCallback(async (reason?: string) => {
     await SecureStore.deleteItemAsync(KEY_TOKEN);
     await SecureStore.deleteItemAsync(KEY_USER);
     configureApi({ token: null });
+    setSignedOutReason(reason ?? null);
     setUser(null);
   }, []);
 
@@ -41,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ]);
       const base = url || DEFAULT_URL;
       setApiUrlState(base);
-      configureApi({ baseUrl: base, token, onUnauthorized: () => void clearSession() });
+      configureApi({ baseUrl: base, token, onUnauthorized: (reason) => void clearSession(reason) });
       if (token && userJson) setUser(JSON.parse(userJson));
       setReady(true);
     })();
@@ -59,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await SecureStore.setItemAsync(KEY_TOKEN, res.token);
     await SecureStore.setItemAsync(KEY_USER, JSON.stringify(res.user));
     configureApi({ token: res.token });
+    setSignedOutReason(null);
     setUser(res.user);
   }, []);
 
@@ -72,8 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearSession]);
 
   const value = useMemo(
-    () => ({ ready, user, apiUrl, setApiUrl, signIn, signOut }),
-    [ready, user, apiUrl, setApiUrl, signIn, signOut]
+    () => ({ ready, user, signedOutReason, apiUrl, setApiUrl, signIn, signOut }),
+    [ready, user, signedOutReason, apiUrl, setApiUrl, signIn, signOut]
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
