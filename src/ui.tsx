@@ -6,10 +6,10 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   KeyboardTypeOptions,
   Modal,
-  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -103,15 +103,20 @@ export function useLoader<T>(load: () => Promise<T>) {
     loadRef.current = load;
   });
 
+  // Only the newest request may write state, so a slow earlier load (e.g. the
+  // focus refresh) can't overwrite fresher data that arrived after it.
+  const seq = useRef(0);
   const reload = useCallback(async () => {
+    const id = ++seq.current;
     setLoading(true);
     setError(null);
     try {
-      setData(await loadRef.current());
+      const next = await loadRef.current();
+      if (id === seq.current) setData(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (id === seq.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (id === seq.current) setLoading(false);
     }
   }, []);
 
@@ -552,11 +557,22 @@ export function Sheet({
   children: React.ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  // While the keyboard is up it already covers the home indicator area, so drop
+  // that inset; otherwise the sheet floats with an empty band above the keys.
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardUp(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardUp(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]} onPress={onClose} accessibilityLabel="Close" />
-        <View style={[ui.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 4 }]}>
+        <View style={[ui.sheet, { paddingBottom: (keyboardUp ? 16 : Math.max(insets.bottom, 16)) + 4 }]}>
           <View style={ui.grabber} />
           <View style={[ui.between, { marginBottom: subtitle ? 2 : 16 }]}>
             <Text style={ui.sheetTitle} numberOfLines={1}>

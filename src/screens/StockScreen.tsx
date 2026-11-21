@@ -34,7 +34,7 @@ export default function StockScreen() {
   const { user } = useAuth();
   const isOwner = user?.role === 'owner';
   const nav = useNavigation<NativeStackNavigationProp<StockStackParams>>();
-  const { data, error, loading, reload } = useLoader(() => api.inventory());
+  const { data, error, loading, reload, setData } = useLoader(() => api.inventory());
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('All');
   const [restocking, setRestocking] = useState<InventoryItem | null>(null);
@@ -56,7 +56,7 @@ export default function StockScreen() {
   return (
     <Screen>
       <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, gap: 12 }}>
-        <SearchField value={q} onChangeText={setQ} placeholder="Search name, ID, size, colour" />
+        <SearchField value={q} onChangeText={setQ} placeholder="Search name, category, ID, size, colour" />
         <Chips options={FILTERS} value={filter} onChange={setFilter} counts={data ? counts : undefined} />
         <ErrorText message={error} />
       </View>
@@ -109,12 +109,20 @@ export default function StockScreen() {
         }}
       />
       {isOwner ? <Fab title="New item" onPress={() => nav.navigate('AddItem')} /> : null}
-      <RestockSheet item={restocking} onClose={() => setRestocking(null)} onDone={reload} />
+      <RestockSheet
+        item={restocking}
+        onClose={() => setRestocking(null)}
+        onDone={(updated) => {
+          // Show the new count straight away, then refetch to pick up anything else that changed.
+          setData((d) => (d ? { ...d, items: d.items.map((i) => (i.itemId === updated.itemId ? { ...i, ...updated } : i)) } : d));
+          void reload();
+        }}
+      />
     </Screen>
   );
 }
 
-function RestockSheet({ item, onClose, onDone }: { item: InventoryItem | null; onClose: () => void; onDone: () => void }) {
+function RestockSheet({ item, onClose, onDone }: { item: InventoryItem | null; onClose: () => void; onDone: (updated: InventoryItem) => void }) {
   const toast = useToast();
   const [qty, setQty] = useState('');
   const [busy, setBusy] = useState(false);
@@ -134,11 +142,12 @@ function RestockSheet({ item, onClose, onDone }: { item: InventoryItem | null; o
     setBusy(true);
     setError(null);
     try {
-      await api.restock(item.itemId, n);
+      const res = await api.restock(item.itemId, n);
+      const updated: InventoryItem = res && res.itemId ? res : { ...item, currentStock: item.currentStock + n };
       success();
-      toast(`Added ${n} to ${item.name}. Now ${item.currentStock + n} in stock.`);
+      toast(`Added ${n} to ${item.name}. Now ${updated.currentStock} in stock.`);
       close();
-      onDone();
+      onDone(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

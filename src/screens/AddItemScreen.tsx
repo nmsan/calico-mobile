@@ -1,22 +1,57 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, Text, View } from 'react-native';
 import { api } from '../api';
+import { DEFAULT_ITEM_CATEGORIES, useItemCategories } from '../categories';
+import { DEFAULT_ITEM_SIZES, useItemSizes } from '../sizes';
+import { AutocompleteInput, useItemSuggestions } from '../suggestions';
 import { colors } from '../theme';
-import { Button, Card, Chips, ErrorText, Input, Label, moneyShort, Screen, SectionLabel, success, toNumber, ui, useToast } from '../ui';
-
-const CATEGORIES = ['Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Accessories'];
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+import { Button, Card, ErrorText, Input, Label, moneyShort, Screen, SectionLabel, success, tap, toNumber, ui, useToast } from '../ui';
 
 export default function AddItemScreen() {
   const nav = useNavigation();
   const toast = useToast();
   const headerHeight = useHeaderHeight();
+  const { categories, addCategory, removeCategory } = useItemCategories();
+  const { sizes, addSize, removeSize } = useItemSizes();
+  const { itemNames, knownColors, itemDetails, saveSuggestion } = useItemSuggestions();
+
   const [f, setF] = useState({ itemId: '', category: 'Tops', name: '', size: 'M', color: '', costPrice: '', sellingPrice: '', initialStock: '' });
+  const [showAddCat, setShowAddCat] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [showAddSize, setShowAddSize] = useState(false);
+  const [newSizeName, setNewSizeName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (v: string) => setF((s) => ({ ...s, [k]: v }));
+
+  async function handleAddCategory() {
+    const trimmed = newCatName.trim();
+    if (!trimmed) return;
+    const added = await addCategory(trimmed);
+    if (added) {
+      set('category')(added);
+      toast(`Category "${added}" added`);
+      success();
+    }
+    setNewCatName('');
+    setShowAddCat(false);
+  }
+
+  async function handleAddSize() {
+    const trimmed = newSizeName.trim();
+    if (!trimmed) return;
+    const added = await addSize(trimmed);
+    if (added) {
+      set('size')(added);
+      toast(`Size "${added}" added`);
+      success();
+    }
+    setNewSizeName('');
+    setShowAddSize(false);
+  }
 
   const cost = toNumber(f.costPrice);
   const price = toNumber(f.sellingPrice);
@@ -31,6 +66,7 @@ export default function AddItemScreen() {
     setBusy(true);
     try {
       await api.addItem({ ...f, itemId: f.itemId.trim(), name: f.name.trim(), color: f.color.trim(), costPrice: cost, sellingPrice: price, initialStock: stock });
+      void saveSuggestion(f.name.trim(), f.color.trim());
       success();
       toast(`${f.name.trim()} added to stock.`);
       nav.goBack();
@@ -43,16 +79,287 @@ export default function AddItemScreen() {
 
   return (
     <Screen>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }} keyboardVerticalOffset={headerHeight}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }} keyboardVerticalOffset={headerHeight}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
           <Card>
             <SectionLabel style={{ marginBottom: 12 }}>The piece</SectionLabel>
-            <Input label="Item name" value={f.name} onChangeText={set('name')} autoCapitalize="words" placeholder="Linen shirt" />
-            <Label>Category</Label>
-            <Chips options={CATEGORIES} value={f.category} onChange={set('category')} style={{ marginBottom: 16 }} />
-            <Label>Size</Label>
-            <Chips options={SIZES} value={f.size} onChange={set('size')} style={{ marginBottom: 16 }} />
-            <Input label="Colour" value={f.color} onChangeText={set('color')} autoCapitalize="words" placeholder="White" />
+
+            {/* Item Name with Spreadsheet-like autocomplete */}
+            <AutocompleteInput
+              label="Item name"
+              value={f.name}
+              onChangeText={set('name')}
+              suggestions={itemNames}
+              autoCapitalize="words"
+              placeholder="Linen shirt"
+              onSelectSuggestion={(selectedName) => {
+                const detail = itemDetails[selectedName.toLowerCase()];
+                if (detail) {
+                  setF((prev) => ({
+                    ...prev,
+                    name: selectedName,
+                    category: detail.category || prev.category,
+                    costPrice: detail.costPrice !== undefined && !prev.costPrice ? String(detail.costPrice) : prev.costPrice,
+                    sellingPrice: detail.sellingPrice !== undefined && !prev.sellingPrice ? String(detail.sellingPrice) : prev.sellingPrice,
+                  }));
+                }
+              }}
+            />
+
+            {/* Category header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Label>Category</Label>
+              <Pressable
+                onPress={() => {
+                  tap();
+                  setShowAddCat((prev) => !prev);
+                }}
+                hitSlop={8}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 }}
+                accessibilityRole="button"
+                accessibilityLabel={showAddCat ? 'Cancel adding category' : 'Add new category'}
+              >
+                <Ionicons name={showAddCat ? 'close-circle-outline' : 'add-circle-outline'} size={16} color={colors.rust} />
+                <Text style={{ color: colors.rust, fontSize: 13, fontWeight: '600' }}>
+                  {showAddCat ? 'Cancel' : '+ New category'}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Category add input */}
+            {showAddCat ? (
+              <View
+                style={{
+                  marginBottom: 12,
+                  backgroundColor: colors.shell,
+                  padding: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.ink, marginBottom: 8 }}>Add custom category</Text>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <Input
+                    placeholder="e.g. Shoes, Bags, Jewellery"
+                    value={newCatName}
+                    onChangeText={setNewCatName}
+                    autoCapitalize="words"
+                    autoFocus
+                    style={{ flex: 1, marginBottom: 0 }}
+                    onSubmitEditing={handleAddCategory}
+                    returnKeyType="done"
+                  />
+                  <Button
+                    title="Add"
+                    onPress={handleAddCategory}
+                    disabled={!newCatName.trim()}
+                    style={{ minHeight: 46, paddingHorizontal: 16 }}
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {/* Category chips */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              {categories.map((cat) => {
+                const on = f.category === cat;
+                const isCustom = !DEFAULT_ITEM_CATEGORIES.includes(cat);
+                return (
+                  <Pressable
+                    key={cat}
+                    onPress={() => {
+                      if (!on) tap();
+                      set('category')(cat);
+                    }}
+                    onLongPress={
+                      isCustom
+                        ? () => {
+                            Alert.alert('Remove Category', `Remove "${cat}" from your category list?`, [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Remove',
+                                style: 'destructive',
+                                onPress: () => {
+                                  void removeCategory(cat);
+                                  if (f.category === cat) {
+                                    set('category')(DEFAULT_ITEM_CATEGORIES[0]);
+                                  }
+                                  toast(`Removed "${cat}"`);
+                                },
+                              },
+                            ]);
+                          }
+                        : undefined
+                    }
+                    style={[ui.chip, on && ui.chipOn]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityHint={isCustom ? 'Long-press to remove' : undefined}
+                  >
+                    <Text style={[ui.chipText, on && { color: '#fff' }]}>{cat}</Text>
+                  </Pressable>
+                );
+              })}
+
+              {!showAddCat ? (
+                <Pressable
+                  onPress={() => {
+                    tap();
+                    setShowAddCat(true);
+                  }}
+                  style={[
+                    ui.chip,
+                    {
+                      borderStyle: 'dashed',
+                      borderColor: colors.rust,
+                      backgroundColor: 'transparent',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add new category"
+                >
+                  <Ionicons name="add" size={15} color={colors.rust} />
+                  <Text style={[ui.chipText, { color: colors.rust, fontWeight: '600' }]}>Add</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* Size header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Label>Size</Label>
+              <Pressable
+                onPress={() => {
+                  tap();
+                  setShowAddSize((prev) => !prev);
+                }}
+                hitSlop={8}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 }}
+                accessibilityRole="button"
+                accessibilityLabel={showAddSize ? 'Cancel adding size' : 'Add new size'}
+              >
+                <Ionicons name={showAddSize ? 'close-circle-outline' : 'add-circle-outline'} size={16} color={colors.rust} />
+                <Text style={{ color: colors.rust, fontSize: 13, fontWeight: '600' }}>
+                  {showAddSize ? 'Cancel' : '+ New size'}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Size add input */}
+            {showAddSize ? (
+              <View
+                style={{
+                  marginBottom: 12,
+                  backgroundColor: colors.shell,
+                  padding: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.ink, marginBottom: 8 }}>Add custom size</Text>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                  <Input
+                    placeholder="e.g. 3XL, Free Size, 32, UK 10"
+                    value={newSizeName}
+                    onChangeText={setNewSizeName}
+                    autoCapitalize="characters"
+                    autoFocus
+                    style={{ flex: 1, marginBottom: 0 }}
+                    onSubmitEditing={handleAddSize}
+                    returnKeyType="done"
+                  />
+                  <Button
+                    title="Add"
+                    onPress={handleAddSize}
+                    disabled={!newSizeName.trim()}
+                    style={{ minHeight: 46, paddingHorizontal: 16 }}
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {/* Size chips */}
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+              {sizes.map((sz) => {
+                const on = f.size === sz;
+                const isCustom = !DEFAULT_ITEM_SIZES.includes(sz);
+                return (
+                  <Pressable
+                    key={sz}
+                    onPress={() => {
+                      if (!on) tap();
+                      set('size')(sz);
+                    }}
+                    onLongPress={
+                      isCustom
+                        ? () => {
+                            Alert.alert('Remove Size', `Remove "${sz}" from your size list?`, [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Remove',
+                                style: 'destructive',
+                                onPress: () => {
+                                  void removeSize(sz);
+                                  if (f.size === sz) {
+                                    set('size')(DEFAULT_ITEM_SIZES[2] || 'M');
+                                  }
+                                  toast(`Removed "${sz}"`);
+                                },
+                              },
+                            ]);
+                          }
+                        : undefined
+                    }
+                    style={[ui.chip, on && ui.chipOn]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: on }}
+                    accessibilityHint={isCustom ? 'Long-press to remove' : undefined}
+                  >
+                    <Text style={[ui.chipText, on && { color: '#fff' }]}>{sz}</Text>
+                  </Pressable>
+                );
+              })}
+
+              {!showAddSize ? (
+                <Pressable
+                  onPress={() => {
+                    tap();
+                    setShowAddSize(true);
+                  }}
+                  style={[
+                    ui.chip,
+                    {
+                      borderStyle: 'dashed',
+                      borderColor: colors.rust,
+                      backgroundColor: 'transparent',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add new size"
+                >
+                  <Ionicons name="add" size={15} color={colors.rust} />
+                  <Text style={[ui.chipText, { color: colors.rust, fontWeight: '600' }]}>Add</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* Colour with Spreadsheet-like autocomplete */}
+            <AutocompleteInput
+              label="Colour"
+              value={f.color}
+              onChangeText={set('color')}
+              suggestions={knownColors}
+              autoCapitalize="words"
+              placeholder="White"
+            />
+
             <Input
               label="Item ID"
               value={f.itemId}
