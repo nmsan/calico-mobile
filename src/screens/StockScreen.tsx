@@ -43,21 +43,61 @@ export default function StockScreen() {
   const lowLevel = data?.lowStockLevel ?? 5;
   const isLow = (i: InventoryItem) => i.currentStock > 0 && i.currentStock <= lowLevel;
   const isOut = (i: InventoryItem) => i.currentStock <= 0;
-  const counts = { All: all.length, Low: all.filter(isLow).length, Out: all.filter(isOut).length };
 
   const query = q.trim().toLowerCase();
-  const items = all.filter((i) => {
-    if (filter === 'Low' && !isLow(i)) return false;
-    if (filter === 'Out' && !isOut(i)) return false;
+
+  // Search filter applied to all items first
+  const queryFiltered = all.filter((i) => {
     if (!query) return true;
     return `${i.itemId} ${i.name} ${i.category} ${i.size} ${i.color}`.toLowerCase().includes(query);
   });
 
+  // Dynamic counts for the chips based on active search query
+  const counts = {
+    All: queryFiltered.length,
+    Low: queryFiltered.filter(isLow).length,
+    Out: queryFiltered.filter(isOut).length,
+  };
+
+  // Final items after applying tab filter (All / Low / Out)
+  const items = queryFiltered.filter((i) => {
+    if (filter === 'Low') return isLow(i);
+    if (filter === 'Out') return isOut(i);
+    return true;
+  });
+
+  const totalUnits = items.reduce((sum, i) => sum + Math.max(0, i.currentStock), 0);
+  const isFiltered = Boolean(query || filter !== 'All');
+
   return (
     <Screen>
-      <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12, gap: 12 }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, gap: 10 }}>
         <SearchField value={q} onChangeText={setQ} placeholder="Search name, category, ID, size, colour" />
         <Chips options={FILTERS} value={filter} onChange={setFilter} counts={data ? counts : undefined} />
+        {data && all.length > 0 ? (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+            <Text style={[ui.muted, { fontSize: 13, fontWeight: isFiltered ? '600' : '500', color: isFiltered ? colors.ink : colors.muted }]}>
+              {isFiltered
+                ? `Showing ${items.length} of ${all.length} item${all.length === 1 ? '' : 's'}`
+                : `${all.length} item${all.length === 1 ? '' : 's'}`}
+              {items.length > 0 ? ` · ${totalUnits} unit${totalUnits === 1 ? '' : 's'}` : ''}
+            </Text>
+            {isFiltered ? (
+              <Pressable
+                onPress={() => {
+                  tap();
+                  setQ('');
+                  setFilter('All');
+                }}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Reset filters"
+              >
+                <Text style={{ fontSize: 12, color: colors.rust, fontWeight: '600' }}>Reset filter</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
         <ErrorText message={error} />
       </View>
       <FlatList
