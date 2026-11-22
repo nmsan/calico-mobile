@@ -1,0 +1,313 @@
+<title>Calico App Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a brand sheet (tokens, type) above a row of phone frames, then the UX change log per screen.
+   Single light theme on purpose: the app ships with userInterfaceStyle "light". */
+:root {
+  --paper: #FAF8F5;   /* app background, poster white warmed slightly */
+  --surface: #FFFFFF;
+  --line: #ECE5DC;
+  --ink: #17130F;     /* wordmark black */
+  --ink-2: #4A423B;
+  --muted: #857A70;
+  --rust: #9B3F22;    /* shell, deep petal */
+  --terra: #C95F37;   /* shell, bright petal */
+  --sand: #E1CEB1;
+  --shell: #F7EEE2;
+  --owed: #B3261E; --owed-bg: #FBEAE8;
+  --ok: #2E6B45;   --ok-bg: #E5F1E8;
+  --low: #9A5800;  --low-bg: #FDF0DC;
+  --serif: "Young Serif", Georgia, "Times New Roman", serif;
+  --sans: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 40px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 56px; }
+.eyebrow { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(34px, 6vw, 56px); letter-spacing: .06em; margin: 0; line-height: 1.05; }
+h2 { font-family: var(--serif); font-weight: 400; font-size: 26px; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 64ch; color: var(--ink-2); }
+header.top { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
+header.top .mark { width: 88px; }
+header.top .rule { width: 56px; height: 3px; background: var(--ink); border-radius: 2px; margin: 14px 0 12px; }
+section { display: grid; gap: 20px; }
+
+/* tokens */
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.sw { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.sw i { display: block; height: 64px; }
+.sw div { padding: 10px 12px; font-size: 13px; }
+.sw b { display: block; font-weight: 600; }
+.sw code { color: var(--muted); font-size: 12px; }
+.type { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.type > div { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 6px; align-content: start; }
+.type .s1 { font-family: var(--serif); font-size: 34px; line-height: 1.1; }
+.type .s2 { font-family: var(--serif); font-size: 26px; }
+.type .s3 { font-size: 16px; font-weight: 600; }
+.type .s4 { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
+.type small { color: var(--muted); font-size: 12px; }
+
+/* phones */
+.phones { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 28px; }
+figure { margin: 0; display: grid; gap: 10px; }
+figcaption { font-size: 13px; color: var(--muted); }
+figcaption b { color: var(--ink); font-weight: 600; }
+.phone { width: 100%; max-width: 320px; aspect-ratio: 320 / 660; background: var(--paper); border: 1px solid #DCD3C7; border-radius: 36px; overflow: hidden; position: relative; display: flex; flex-direction: column; box-shadow: 0 20px 40px -24px rgba(60, 35, 20, .35); font-size: 13px; }
+.sb { height: 34px; flex: none; }
+.hd { padding: 4px 18px 10px; display: flex; align-items: flex-end; justify-content: space-between; }
+.hd .t { font-family: var(--serif); font-size: 26px; line-height: 1.1; }
+.hd .av { width: 30px; height: 30px; border-radius: 50%; background: var(--shell); border: 1px solid var(--line); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--rust); }
+.body { flex: 1; overflow: hidden; padding: 0 14px; display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.lbl { font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.muted { color: var(--muted); font-size: 11.5px; }
+.strong { font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+.search { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 10px; font-size: 11.5px; }
+.chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.chip em { font-style: normal; opacity: .6; margin-left: 4px; }
+.pill { font-size: 10px; font-weight: 600; border-radius: 999px; padding: 2px 8px; display: inline-block; }
+.p-ok { background: var(--ok-bg); color: var(--ok); }
+.p-low { background: var(--low-bg); color: var(--low); }
+.p-owed { background: var(--owed-bg); color: var(--owed); }
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.li { padding: 10px 12px; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+.li:first-child { border-top: 0; }
+.li .grow { flex: 1; min-width: 0; }
+.qty { font-weight: 700; font-size: 19px; text-align: right; line-height: 1; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.stepper span { width: 26px; height: 26px; display: grid; place-items: center; font-weight: 600; }
+.stepper span.v { width: 28px; border-inline: 1px solid var(--line); }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--shell); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg span { text-align: center; padding: 6px 0; border-radius: 8px; font-size: 11.5px; color: var(--ink-2); }
+.seg span.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.btn { background: var(--ink); color: #fff; border-radius: 12px; text-align: center; padding: 11px; font-weight: 600; }
+.btn.alt { background: var(--shell); color: var(--ink); }
+.dock { border-top: 1px solid var(--line); background: var(--surface); padding: 10px 14px; display: flex; gap: 12px; align-items: center; }
+.dock .tot { flex: 1; }
+.dock .tot b { font-weight: 700; letter-spacing: -.02em; font-size: 19px; display: block; line-height: 1.15; }
+.tabs { border-top: 1px solid var(--line); background: var(--surface); display: grid; grid-template-columns: repeat(var(--n, 5), 1fr); padding: 8px 4px 18px; font-size: 9.5px; color: var(--muted); text-align: center; }
+.tabs span::before { content: ""; display: block; width: 18px; height: 18px; margin: 0 auto 3px; border-radius: 5px; background: currentColor; opacity: .35; }
+.tabs span.on { color: var(--rust); font-weight: 600; }
+.tabs span.on::before { opacity: 1; }
+.fab { position: absolute; right: 16px; bottom: 74px; background: var(--ink); color: #fff; border-radius: 16px; padding: 10px 14px; font-weight: 600; font-size: 12px; box-shadow: 0 8px 18px -8px rgba(0,0,0,.5); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 11px; flex: none; }
+.hero { font-weight: 700; letter-spacing: -.02em; font-size: 28px; line-height: 1.15; }
+.bar { height: 6px; border-radius: 3px; background: var(--shell); overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; }
+
+/* login phone */
+.login { background: var(--surface); align-items: stretch; }
+.login .brand { display: grid; justify-items: center; gap: 8px; padding: 48px 0 26px; }
+.login .brand .m { width: 92px; }
+.login .wm { font-family: var(--serif); font-size: 34px; letter-spacing: .12em; }
+.login .r { width: 44px; height: 2.5px; background: var(--ink); border-radius: 2px; }
+.login .tag { font-size: 9.5px; letter-spacing: .3em; }
+.field { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; background: var(--paper); }
+.field small { display: block; font-size: 9.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.dots { display: flex; gap: 8px; padding: 4px 0 2px; }
+.dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink); }
+.dots i.e { background: transparent; border: 1.5px solid var(--sand); }
+.foot { margin-top: auto; text-align: center; padding: 18px 0 26px; font-size: 9px; letter-spacing: .26em; color: var(--muted); }
+
+/* change log */
+.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.changes article { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: grid; gap: 10px; align-content: start; }
+.changes h3 { font-family: var(--serif); font-weight: 400; font-size: 20px; margin: 0; }
+.changes ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-2); }
+.changes li::marker { color: var(--terra); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="mark" data-shell></div>
+    <div>
+      <div class="eyebrow">Calico shop app · redesign</div>
+      <div class="rule"></div>
+      <h1>CALICO</h1>
+      <p style="margin-top:12px">The app takes its look from the brand poster: a white ground, black serif wordmark, and the shell's rust, terracotta and sand. Brand colour is kept for identity and focus. Red, amber and green mean only money owed, low stock and settled.</p>
+    </div>
+  </header>
+
+  <section>
+    <div class="eyebrow">Colour</div>
+    <div class="swatches">
+      <div class="sw"><i style="background:var(--ink)"></i><div><b>Ink</b><code>#17130F</code> · text, primary buttons</div></div>
+      <div class="sw"><i style="background:var(--rust)"></i><div><b>Rust</b><code>#9B3F22</code> · active tab, links</div></div>
+      <div class="sw"><i style="background:var(--terra)"></i><div><b>Terracotta</b><code>#C95F37</code> · highlights</div></div>
+      <div class="sw"><i style="background:var(--sand)"></i><div><b>Sand</b><code>#E1CEB1</code> · dividers, empty states</div></div>
+      <div class="sw"><i style="background:var(--shell)"></i><div><b>Shell</b><code>#F7EEE2</code> · secondary buttons, segments</div></div>
+      <div class="sw"><i style="background:var(--paper);border-bottom:1px solid var(--line)"></i><div><b>Paper</b><code>#FAF8F5</code> · screen background</div></div>
+      <div class="sw"><i style="background:linear-gradient(90deg,var(--owed) 33%,var(--low) 33% 66%,var(--ok) 66%)"></i><div><b>Status</b><code>owed · low · clear</code></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Type</div>
+    <div class="type">
+      <div><span class="s1" style="font-family:var(--sans);font-weight:700;letter-spacing:-.02em">Rs 48,250.00</span><small>Bold sans · money and counts. Young Serif only has old-style figures, which are harder to read in amounts.</small></div>
+      <div><span class="s2">New sale</span><small>Young Serif · screen titles</small></div>
+      <div><span class="s3">Linen shirt, M / White</span><small>System sans, semibold · list titles</small></div>
+      <div><span class="s4">Simple · Everyday</span><small>System sans, tracked caps · section labels, echoing the tagline</small></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Key screens</div>
+    <div class="phones">
+
+      <figure>
+        <div class="phone login">
+          <div class="sb"></div>
+          <div class="brand"><div class="m" data-shell></div><div class="wm">CALICO</div><div class="r"></div><div class="lbl tag">Simple · Everyday</div></div>
+          <div class="body" style="gap:10px;padding:0 22px">
+            <div class="field"><small>Username</small>nimal</div>
+            <div class="field"><small>PIN</small><div class="dots"><i></i><i></i><i></i><i class="e"></i></div></div>
+            <div class="btn" style="margin-top:6px">Sign in</div>
+          </div>
+          <div class="foot">READY-MADE CLOTHING · SRI LANKA</div>
+        </div>
+        <figcaption><b>Sign in.</b> The poster layout as the welcome screen. PIN entry shows dots.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="phone">
+          <div class="sb"></div>
+          <div class="hd"><span class="t">New sale</span><span class="av">NA</span></div>
+          <div class="body">
+            <div class="card" style="display:grid;gap:8px">
+              <div class="row"><span class="lbl">Items · 2</span><span style="color:var(--rust);font-weight:600;font-size:12px">+ Add item</span></div>
+              <div class="row"><div><div class="strong">Linen shirt</div><div class="muted">M / White · Rs 4,500</div></div><div class="stepper"><span>−</span><span class="v">2</span><span>+</span></div></div>
+              <div class="row"><div><div class="strong">Batik wrap skirt</div><div class="muted">S / Indigo · Rs 6,250 · 1 left</div></div><div class="stepper"><span>−</span><span class="v">1</span><span>+</span></div></div>
+              <div class="muted" style="color:var(--rust)">+ Discount</div>
+            </div>
+            <div class="card" style="display:grid;gap:6px">
+              <div class="row"><span class="lbl">Customer</span><span class="muted">Today ▾</span></div>
+              <div class="search">Search or type a new name</div>
+              <div class="row"><span class="strong">Dilini Perera</span><span class="pill p-owed">Owes Rs 2,000</span></div>
+            </div>
+            <div class="card" style="display:grid;gap:8px">
+              <span class="lbl">Payment</span>
+              <div class="seg"><span class="on">Paid in full</span><span>Part paid</span><span>On credit</span></div>
+            </div>
+          </div>
+          <div class="dock"><div class="tot"><span class="lbl">Total</span><b class="num">Rs 15,250.00</b></div><div class="btn" style="padding:11px 18px">Save sale</div></div>
+          <div class="tabs"><span class="on">Sell</span><span>Stock</span><span>Customers</span><span>Expenses</span><span>Reports</span></div>
+        </div>
+        <figcaption><b>Sell.</b> Items come first, quantities use −/+ steppers, payment is one tap, and the total and Save button stay pinned.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="phone">
+          <div class="sb"></div>
+          <div class="hd"><span class="t">Stock</span><span class="av">NA</span></div>
+          <div class="body">
+            <div class="search">⌕ Search name, ID, size, colour</div>
+            <div class="chips"><span class="chip on">All<em>48</em></span><span class="chip">Low<em>5</em></span><span class="chip">Out<em>2</em></span></div>
+            <div class="list">
+              <div class="li"><div class="grow"><div class="strong">Linen shirt</div><div class="muted">TOP-002-M-WHT · M / White</div><div class="muted">Rs 4,500 · cost Rs 2,100</div></div><div><div class="qty num">14</div><span class="pill p-ok">In stock</span></div></div>
+              <div class="li"><div class="grow"><div class="strong">Batik wrap skirt</div><div class="muted">BOT-011-S-IND · S / Indigo</div><div class="muted">Rs 6,250 · cost Rs 3,000</div></div><div><div class="qty num" style="color:var(--low)">1</div><span class="pill p-low">Low</span></div></div>
+              <div class="li"><div class="grow"><div class="strong">Cotton kaftan</div><div class="muted">DRS-004-L-SND · L / Sand</div><div class="muted">Rs 7,800 · cost Rs 3,400</div></div><div><div class="qty num" style="color:var(--owed)">0</div><span class="pill p-owed">Out</span></div></div>
+            </div>
+          </div>
+          <div class="fab">+ New item</div>
+          <div class="tabs"><span>Sell</span><span class="on">Stock</span><span>Customers</span><span>Expenses</span><span>Reports</span></div>
+        </div>
+        <figcaption><b>Stock.</b> Filter chips show counts. Tapping an item opens a restock sheet with +1, +5 and +10 shortcuts.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="phone">
+          <div class="sb"></div>
+          <div class="hd"><span class="t">Customers</span><span class="av">NA</span></div>
+          <div class="body">
+            <div class="card"><span class="lbl">Owed to you</span><div class="hero num" style="color:var(--owed)">Rs 12,400.00</div><div class="muted">from 3 customers</div></div>
+            <div class="search">⌕ Search name or phone</div>
+            <div class="chips"><span class="chip on">All<em>36</em></span><span class="chip">Owes money<em>3</em></span></div>
+            <div class="list">
+              <div class="li"><span class="avatar" style="background:var(--shell);color:var(--rust)">DP</span><div class="grow"><div class="strong">Dilini Perera</div><div class="muted">077 123 4567 · last 2 Nov</div></div><span class="pill p-owed num">Rs 2,000</span></div>
+              <div class="li"><span class="avatar" style="background:var(--shell);color:var(--rust)">KS</span><div class="grow"><div class="strong">Kasun Silva</div><div class="muted">071 555 0198 · last 28 Oct</div></div><span class="pill p-ok">Clear</span></div>
+            </div>
+          </div>
+          <div class="tabs"><span>Sell</span><span>Stock</span><span class="on">Customers</span><span>Expenses</span><span>Reports</span></div>
+        </div>
+        <figcaption><b>Customers.</b> The total owed comes first, and each row is easy to scan by initials and status.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="phone">
+          <div class="sb"></div>
+          <div class="hd"><span class="t">Reports</span><span class="av">NA</span></div>
+          <div class="body">
+            <div class="row"><span class="strong">‹</span><span class="strong">November 2026</span><span class="strong" style="color:var(--line)">›</span></div>
+            <div class="card" style="display:grid;gap:6px">
+              <span class="lbl">Net profit</span>
+              <div class="hero num" style="color:var(--ok)">Rs 86,420.00</div>
+              <div class="muted">Net margin 24.1%</div>
+              <div class="bar"><i style="width:52%;background:var(--sand)"></i><i style="width:24%;background:var(--terra)"></i><i style="width:24%;background:var(--ok)"></i></div>
+              <div class="muted">Cost of goods · Expenses · Profit</div>
+            </div>
+            <div class="card" style="display:grid;gap:5px">
+              <div class="row"><span>Net revenue</span><span class="num strong">Rs 358,600</span></div>
+              <div class="row"><span class="muted">Cost of goods</span><span class="num">− Rs 186,200</span></div>
+              <div class="row"><span class="muted">Expenses</span><span class="num">− Rs 85,980</span></div>
+              <div class="row" style="border-top:1px solid var(--line);padding-top:5px"><span class="strong">Net profit</span><span class="num strong">Rs 86,420</span></div>
+            </div>
+          </div>
+          <div class="tabs"><span>Sell</span><span>Stock</span><span>Customers</span><span>Expenses</span><span class="on">Reports</span></div>
+        </div>
+        <figcaption><b>Reports.</b> Net profit comes first, with a bar showing where each rupee of revenue went. Sign out moves to the account button.</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">UX changes</div>
+    <h2>What changes for the people at the counter</h2>
+    <div class="changes">
+      <article><h3>Everywhere</h3><ul>
+        <li>Light headers with serif titles replace the navy bars.</li>
+        <li>Every tab has an account button (initials) with sign-out, so Reports no longer holds it. Staff get 3 tabs instead of 4.</li>
+        <li>Saving shows a short confirmation toast instead of a blocking alert.</li>
+        <li>Search fields show an icon and a clear button. Empty states say what to do next.</li>
+      </ul></article>
+      <article><h3>Sell</h3><ul>
+        <li>The order matches a real sale: items, then customer, then payment.</li>
+        <li>Quantity uses a −/+ stepper capped at the stock on hand. Discount stays hidden until it's needed.</li>
+        <li>The item picker shows stock levels and blocks out-of-stock items.</li>
+        <li>Payment is one control: Paid in full, Part paid or On credit.</li>
+        <li>The date defaults to today, with a Yesterday shortcut.</li>
+        <li>The total and Save sale stay pinned above the keyboard.</li>
+      </ul></article>
+      <article><h3>Stock</h3><ul>
+        <li>Filter chips show how many items each filter matches.</li>
+        <li>Stock counts and status pills are colour-coded so problems stand out.</li>
+        <li>The restock sheet has +1, +5 and +10 shortcuts and shows the new total.</li>
+        <li>Owners get a floating "New item" button.</li>
+      </ul></article>
+      <article><h3>Customers &amp; payments</h3><ul>
+        <li>The total owed is the headline, and the "owes money" filter is sorted by largest debt.</li>
+        <li>The customer page leads with the balance, with Full and Half quick amounts.</li>
+        <li>Each purchase shows paid against total at a glance.</li>
+      </ul></article>
+      <article><h3>Expenses &amp; reports</h3><ul>
+        <li>This month's spend is the headline, and new expenses are added from a floating button.</li>
+        <li>Expenses open in a bottom sheet with a large amount field.</li>
+        <li>Reports are a clear P&amp;L with a revenue-split bar and a month switcher.</li>
+      </ul></article>
+    </div>
+  </section>
+</div>
+
+<template id="shell-svg"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="100%" height="100%" aria-label="Calico shell"><svg x="0" y="15.235" width="14.317" height="13.783" viewBox="0 0 186.36000061035156 179.39999389648438" preserveAspectRatio="none" overflow="visible"><path d="M10.86 0c-7.02 7.26002-10.86 16.68002-10.86 27.78 0 13.56003 6.96 27.96002 17.4 36.42001 43.02 32.22 120.24 78.06003 168.96 115.19998-27.72-56.63995-125.94-142.19998-175.5-179.39999z" fill="#C95F37"></path></svg><svg x="0.433" y="9.777" width="14.276" height="19.217" viewBox="0 0 185.82000732421875 250.13998413085938" preserveAspectRatio="none" overflow="visible"><path d="M34.91999 0c-20.52 2.34-34.91999 18.89999-34.91999 39.89999 0 7.79999 1.92 15.17999 5.28 20.76 55.86 46.2 150.66 135.47999 180.54001 189.47999-10.20001-65.94-109.86-201.95999-150.90002-250.13998z" fill="#C95F37"></path></svg><svg x="3.439" y="5.974" width="11.731" height="23.039" viewBox="0.000003814697265625 0 152.70000839233398 299.8800048828125" preserveAspectRatio="none" overflow="visible"><path d="M49.13999 0.23999c-1.61999-0.17999-3.11999-0.23999-4.85999-0.23999-24.48 0-44.28 19.14-44.28 43.08 50.57999 64.56 135.72 196.31999 152.70001 256.8-2.64001-72.11999-66.24001-226.56001-103.56002-299.64001z" fill="#9B3F22"></path></svg><svg x="7.68" y="3.425" width="7.926" height="25.611" viewBox="0.000003814697265625 0 103.16100692749023 333.3599853515625" preserveAspectRatio="none" overflow="visible"><path d="M66.66 4.62c-6.78001-3.24-13.98001-4.62-22.8-4.62-21.24001 0-39.84001 13.68001-43.86 29.46 36.89999 85.43999 93.17999 241.38003 103.13998 303.89999 0.84003-69.59998-23.69998-246.83999-36.47998-328.73999z" fill="#E1CEB1"></path></svg><svg x="12.815" y="1.95" width="6.016" height="27.086" viewBox="0 0 78.29998779296875 352.55999755859375" preserveAspectRatio="none" overflow="visible"><path d="M41.03999 0c-18.96001 0-34.92 10.14-41.03999 22.14 12.78 83.64 36.36 252.96001 40.32001 330.41997l0.95999 0c3.42-77.39997 25.86002-250.49997 37.01999-336.47997-8.63998-10.08-22.43999-16.08-37.26-16.08z" fill="#F0E4D3"></path></svg><svg x="15.935" y="3.185" width="8.32" height="25.851" viewBox="-0.000003814697265625 0 108.29999160766602 336.47998046875" preserveAspectRatio="none" overflow="visible"><path d="M65.39999 3.24c-8.94 0-17.10001 2.22-22.07998 4.85999-1.86002-3.12-3.95999-6.05999-5.75998-8.09999-11.76004 83.51999-35.82002 253.98-37.56003 336.47998l0.84 0c11.34-79.32001 69.95999-229.13998 107.45999-305.69998-6.05997-16.5-23.04001-27.54-42.9-27.54z" fill="#9B3F22"></path></svg><svg x="16.318" y="5.979" width="12.22" height="23.057" viewBox="0 0 159.05999755859375 300.1199645996094" preserveAspectRatio="none" overflow="visible"><path d="M114.12 0c-2.57999 0-4.80002 0.17999-6.42002 0.48-39.35998 78.48-99.89999 228.77998-107.69998 299.63996 20.88001-71.33996 110.39999-197.45996 159.06-258.11996-0.29999-24.24001-20.34-42-44.94-42z" fill="#C95F37"></path></svg><svg x="16.761" y="9.772" width="14.769" height="19.268" viewBox="0 0 192.24066162109375 250.79998779296875" preserveAspectRatio="none" overflow="visible"><path d="M155.40001 0c-46.92001 56.09998-144 197.22-155.40001 250.79999 34.74-55.62 130.50002-147.24002 187.68001-190.26 3.23999-6.17999 4.56-13.14 4.56-21.17999 0.11999-22.32001-16.20002-38.58002-36.84-39.36z" fill="#E1CEB1"></path></svg><svg x="17.24" y="15.235" width="14.751" height="13.847" viewBox="0 0 192.00564575195312 180.24002075195312" preserveAspectRatio="none" overflow="visible"><path d="M181.08002 0c-58.32001 45.90002-145.92002 126.54001-181.08002 180.24002l4.5 0c52.62-37.56 119.22-79.79999 169.01999-115.26001 11.28-9.29999 18.48001-23.88001 18.48001-37.79999 0.17999-11.10001-3.96002-20.52002-10.91998-27.18002z" fill="#9B3F22"></path></svg><svg x="9.728" y="26.745" width="4.092" height="3.214" viewBox="-0.0000069588422775268555 -0.0000019073486328125 53.26352624595165 41.83333778381348" preserveAspectRatio="none" overflow="visible"><path d="M9.16354 0l-9 35.10001c-0.96001 4.20001 2.45999 7.44 6.23999 6.6l46.85999-10.74002-44.09998-30.95999z" fill="#C95F37"></path></svg><svg x="18.13" y="26.773" width="4.118" height="3.227" viewBox="0 0 53.60039520263672 41.997806549072266" preserveAspectRatio="none" overflow="visible"><path d="M44.39996 0l-44.39996 31.19998 47.27997 10.62003c4.14002 1.01999 7.14002-2.52002 6.11999-6.23999l-9-35.58002z" fill="#C95F37"></path></svg></svg></template>
+<script>
+  const tpl = document.getElementById('shell-svg');
+  document.querySelectorAll('[data-shell]').forEach((el) => el.appendChild(tpl.content.cloneNode(true)));
+</script>
