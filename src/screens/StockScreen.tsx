@@ -1,9 +1,12 @@
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { api } from '../api';
 import { useAuth } from '../auth';
+import { ItemPhotoPreview, ItemPhotoViewer, ItemThumb } from '../components/ItemPhoto';
+import { PhotoPicker } from '../components/PhotoPicker';
+import { refreshItemThumbs, setItemThumb, useItemThumbs, type ItemThumb as Thumb, type PickedPhoto } from '../photos';
 import type { StockStackParams } from '../navigation';
 import { canManage, type InventoryItem } from '../types';
 import { colors } from '../theme';
@@ -16,6 +19,7 @@ import {
   Fab,
   groupRow,
   Input,
+  LinkButton,
   moneyShort,
   Screen,
   SearchField,
@@ -38,6 +42,14 @@ export default function StockScreen() {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('All');
   const [restocking, setRestocking] = useState<InventoryItem | null>(null);
+  const [viewing, setViewing] = useState<{ thumb: Thumb; title: string } | null>(null);
+  const thumbOf = useItemThumbs();
+  // Photos can change on another phone; pick up new ones whenever Stock is opened.
+  useFocusEffect(
+    useCallback(() => {
+      void refreshItemThumbs();
+    }, [])
+  );
 
   const all = data?.items ?? [];
   const lowLevel = data?.lowStockLevel ?? 5;
@@ -128,9 +140,16 @@ export default function StockScreen() {
               }
               accessibilityRole={isOwner ? 'button' : undefined}
               accessibilityHint={isOwner ? 'Restock this item' : undefined}
-              style={({ pressed }) => [groupRow(index, items.length), pressed && isOwner && { backgroundColor: colors.pressed }]}
+              style={({ pressed }) => [groupRow(index, items.length), { gap: 12 }, pressed && isOwner && { backgroundColor: colors.pressed }]}
             >
-              <View style={{ flex: 1, paddingRight: 12 }}>
+              <ItemThumb
+                thumb={thumbOf(item.name, item.color)}
+                onPress={() => {
+                  const t = thumbOf(item.name, item.color);
+                  if (t) setViewing({ thumb: t, title: `${item.name} · ${item.color}` });
+                }}
+              />
+              <View style={{ flex: 1, paddingRight: 4 }}>
                 <Text style={ui.rowTitle}>{item.name}</Text>
                 <Text style={ui.muted}>
                   {item.size} / {item.color} · {item.category}
@@ -149,8 +168,14 @@ export default function StockScreen() {
         }}
       />
       {isOwner ? <Fab title="New item" iconOnly onPress={() => nav.navigate('AddItem')} /> : null}
+      <ItemPhotoViewer thumb={viewing?.thumb ?? null} title={viewing?.title} onClose={() => setViewing(null)} />
       <RestockSheet
         item={restocking}
+        thumb={restocking ? thumbOf(restocking.name, restocking.color) : undefined}
+        onEdit={(item) => {
+          setRestocking(null);
+          nav.navigate('EditItem', { item, pricesLocked: item.unitsSold > 0 && !data?.salePricesSaved });
+        }}
         onClose={() => setRestocking(null)}
         onDone={(updated) => {
           // Show the new count straight away, then refetch to pick up anything else that changed.
@@ -162,12 +187,54 @@ export default function StockScreen() {
   );
 }
 
-function RestockSheet({ item, onClose, onDone }: { item: InventoryItem | null; onClose: () => void; onDone: (updated: InventoryItem) => void }) {
+function RestockSheet({
+  item,
+  thumb,
+  onEdit,
+  onClose,
+  onDone,
+}: {
+  item: InventoryItem | null;
+  thumb?: Thumb;
+  onEdit: (item: InventoryItem) => void;
+  onClose: () => void;
+  onDone: (updated: InventoryItem) => void;
+}) {
   const toast = useToast();
   const [qty, setQty] = useState('');
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const n = toNumber(qty);
+
+  async function savePhoto(photo: PickedPhoto) {
+    if (!item || !photo.thumb) return;
+    setPhotoBusy(true);
+    try {
+      const r = await api.setItemPhoto(item.itemId, photo.base64, photo.thumb);
+      setItemThumb(item.name, item.color, { photoId: r.photoId, thumb: r.thumb, full: photo.base64 });
+      success();
+      toast(`Photo saved for every ${item.name} in ${item.color || 'this colour'}.`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'error');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    if (!item) return;
+    setPhotoBusy(true);
+    try {
+      await api.removeItemPhoto(item.itemId);
+      setItemThumb(item.name, item.color, null);
+      toast('Photo removed.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'error');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
   const valid = Number.isInteger(n) && n > 0;
 
   function close() {
@@ -202,7 +269,31 @@ function RestockSheet({ item, onClose, onDone }: { item: InventoryItem | null; o
 
   return (
     <Sheet visible={!!item} title={`Restock ${item?.name ?? ''}`} subtitle={`${item?.size} / ${item?.color} · ${item?.currentStock} in stock now`} onClose={close}>
-      <Input label="Units received" value={qty} onChangeText={setQty} keyboardType="number-pad" large placeholder="0" autoFocus />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+        <PhotoPicker
+          kind="item"
+          name={item?.name ?? ''}
+          busy={photoBusy}
+          hasPhoto={!!thumb}
+          preview={<ItemPhotoPreview thumb={thumb} width={72} />}
+          onPicked={(p) => void savePhoto(p)}
+          onRemove={() => void removePhoto()}
+        />
+        <View style={{ flex: 1, gap: 8, alignItems: 'flex-start' }}>
+          <Text style={[ui.muted, { fontSize: 13 }]}>{thumb ? 'Tap the photo to change it. Every size in this colour shares it.' : 'Add a photo so staff can spot this piece at a glance.'}</Text>
+          <LinkButton
+            title="Edit details"
+            icon="create-outline"
+            onPress={() => {
+              if (!item) return;
+              setQty('');
+              setError(null);
+              onEdit(item);
+            }}
+          />
+        </View>
+      </View>
+      <Input label="Units received" value={qty} onChangeText={setQty} keyboardType="number-pad" large placeholder="0" />
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
         {[1, 5, 10].map((by) => (
           <Button key={by} title={`+${by}`} variant="secondary" onPress={() => add(by)} style={{ flex: 1, paddingVertical: 11 }} />

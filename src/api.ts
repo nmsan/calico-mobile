@@ -75,7 +75,7 @@ export const api = {
   logout: () => call<{ loggedOut: boolean }>('logout'),
   meta: () => call<Meta>('getMeta'),
 
-  inventory: () => call<{ lowStockLevel: number; items: InventoryItem[] }>('getInventory'),
+  inventory: () => call<{ lowStockLevel: number; salePricesSaved?: boolean; items: InventoryItem[] }>('getInventory'),
   addItem: (item: {
     itemId: string;
     category: string;
@@ -86,6 +86,16 @@ export const api = {
     sellingPrice: number;
     initialStock: number;
   }) => call<InventoryItem>('addInventoryItem', item),
+  updateItem: (item: {
+    itemId: string;
+    category: string;
+    name: string;
+    size: string;
+    color: string;
+    costPrice?: number;
+    sellingPrice?: number;
+    stock: number;
+  }) => call<InventoryItem>('updateInventoryItem', item),
   restock: (itemId: string, qty: number) => call<InventoryItem>('restockItem', { itemId, qty }),
 
   recordSale: (sale: { date?: string; customerName: string; contact: string; amountPaid: number; items: SaleLineInput[] }) =>
@@ -95,6 +105,11 @@ export const api = {
     call<SalesDailyResult>('getSalesDaily', includeLines ? { from, to, includeLines } : { from, to }),
 
   customers: () => call<Customer[]>('getCustomers'),
+  itemThumbs: (have: string[]) => call<{ name: string; color: string; photoId: string; thumb?: string }[]>('getItemThumbs', { have }),
+  itemPhoto: (photoId: string) => call<{ photoId: string; mimeType: string; data: string }>('getItemPhoto', { photoId }),
+  setItemPhoto: (itemId: string, data: string, thumb: string) =>
+    call<{ name: string; color: string; photoId: string; thumb: string }>('setItemPhoto', { itemId, data, thumb, mimeType: 'image/jpeg' }),
+  removeItemPhoto: (itemId: string) => call<{ removed: boolean }>('removeItemPhoto', { itemId }),
   addCustomer: (name: string, contact: string) => call<Customer>('addCustomer', { name, contact }),
   setCustomerPhoto: (name: string, contact: string, data: string) =>
     call<{ photoId: string }>('setCustomerPhoto', { name, contact, data, mimeType: 'image/jpeg' }),
