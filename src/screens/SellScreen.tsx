@@ -3,6 +3,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from 'react-native';
 import { api } from '../api';
+import { ItemThumb } from '../components/ItemPhoto';
+import { useItemThumbs } from '../photos';
 import type { Customer, InventoryItem } from '../types';
 import { colors } from '../theme';
 import {
@@ -40,6 +42,7 @@ export default function SellScreen() {
   const toast = useToast();
   const headerHeight = useHeaderHeight();
   const inv = useLoader(() => api.inventory());
+  const thumbOf = useItemThumbs();
   const cust = useLoader(() => api.customers());
 
   const [lines, setLines] = useState<Line[]>([]);
@@ -155,6 +158,7 @@ export default function SellScreen() {
                   {i ? <Divider /> : null}
                   <View style={{ paddingVertical: 12 }}>
                     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                      <ItemThumb thumb={thumbOf(l.item.name, l.item.color)} size={44} />
                       <View style={{ flex: 1 }}>
                         <Text style={ui.rowTitle} numberOfLines={1}>{l.item.name}</Text>
                         <Text style={ui.muted} numberOfLines={1}>
@@ -293,6 +297,7 @@ export default function SellScreen() {
           const inCart = lines.find((l) => l.item.itemId === i.itemId)?.qty ?? 0;
           return (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ItemThumb thumb={thumbOf(i.name, i.color)} size={44} />
               <View style={{ flex: 1 }}>
                 <Text style={ui.rowTitle} numberOfLines={1}>{i.name}</Text>
                 <Text style={ui.muted} numberOfLines={1}>

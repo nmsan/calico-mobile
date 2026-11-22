@@ -5,6 +5,9 @@ import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Pressable, ScrollView, Text, View } from 'react-native';
 import { api } from '../api';
 import { DEFAULT_ITEM_CATEGORIES, useItemCategories } from '../categories';
+import { ItemPhotoPreview } from '../components/ItemPhoto';
+import { PhotoPicker } from '../components/PhotoPicker';
+import { setItemThumb, useItemThumbs, type PickedPhoto } from '../photos';
 import { DEFAULT_ITEM_SIZES, useItemSizes } from '../sizes';
 import { AutocompleteInput, useItemSuggestions } from '../suggestions';
 import { colors } from '../theme';
@@ -23,6 +26,9 @@ export default function AddItemScreen() {
   const [newCatName, setNewCatName] = useState('');
   const [showAddSize, setShowAddSize] = useState(false);
   const [newSizeName, setNewSizeName] = useState('');
+  const [photo, setPhoto] = useState<PickedPhoto | null>(null);
+  const thumbOf = useItemThumbs();
+  const shared = f.name.trim() ? thumbOf(f.name, f.color) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (v: string) => setF((s) => ({ ...s, [k]: v }));
@@ -67,8 +73,20 @@ export default function AddItemScreen() {
     try {
       await api.addItem({ ...f, itemId: f.itemId.trim(), name: f.name.trim(), color: f.color.trim(), costPrice: cost, sellingPrice: price, initialStock: stock });
       void saveSuggestion(f.name.trim(), f.color.trim());
+      let photoFailed = false;
+      if (photo?.thumb) {
+        try {
+          const r = await api.setItemPhoto(f.itemId.trim(), photo.base64, photo.thumb);
+          setItemThumb(r.name, r.color, { photoId: r.photoId, thumb: r.thumb, full: photo.base64 });
+        } catch {
+          photoFailed = true;
+        }
+      }
       success();
-      toast(`${f.name.trim()} added to stock.`);
+      toast(
+        photoFailed ? `${f.name.trim()} added, but the photo did not upload. Add it from Stock.` : `${f.name.trim()} added to stock.`,
+        photoFailed ? 'error' : 'ok'
+      );
       nav.goBack();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -83,6 +101,24 @@ export default function AddItemScreen() {
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
           <Card>
             <SectionLabel style={{ marginBottom: 12 }}>The piece</SectionLabel>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+              <PhotoPicker
+                kind="item"
+                name={f.name}
+                hasPhoto={!!photo}
+                preview={<ItemPhotoPreview uri={photo?.uri} thumb={photo ? undefined : shared} width={96} />}
+                onPicked={setPhoto}
+                onRemove={() => setPhoto(null)}
+              />
+              <Text style={[ui.muted, { flex: 1, fontSize: 13, lineHeight: 18 }]}>
+                {photo
+                  ? 'This photo will be used for every size in this colour.'
+                  : shared
+                    ? `Using the photo already saved for ${f.name.trim()} in ${f.color.trim() || 'this colour'}. Tap to replace it.`
+                    : 'Optional. A clear photo helps staff find the piece when selling.'}
+              </Text>
+            </View>
 
             {/* Item Name with Spreadsheet-like autocomplete */}
             <AutocompleteInput
