@@ -13,6 +13,7 @@ import type {
   RecordSaleResult,
   Sale,
   SaleLineInput,
+  SalesDailyResult,
   User,
 } from './types';
 
@@ -90,8 +91,15 @@ export const api = {
   recordSale: (sale: { date?: string; customerName: string; contact: string; amountPaid: number; items: SaleLineInput[] }) =>
     call<RecordSaleResult>('recordSale', sale),
   recentSales: (limit = 50) => call<Sale[]>('getRecentSales', { limit }),
+  salesDaily: (from: string, to: string, includeLines = false) =>
+    call<SalesDailyResult>('getSalesDaily', includeLines ? { from, to, includeLines } : { from, to }),
 
   customers: () => call<Customer[]>('getCustomers'),
+  addCustomer: (name: string, contact: string) => call<Customer>('addCustomer', { name, contact }),
+  setCustomerPhoto: (name: string, contact: string, data: string) =>
+    call<{ photoId: string }>('setCustomerPhoto', { name, contact, data, mimeType: 'image/jpeg' }),
+  customerPhoto: (photoId: string) => call<{ photoId: string; mimeType: string; data: string }>('getCustomerPhoto', { photoId }),
+  removeCustomerPhoto: (name: string, contact: string) => call<{ removed: boolean }>('removeCustomerPhoto', { name, contact }),
   customerSales: (customerName: string, contact: string) => call<Sale[]>('getCustomerSales', { customerName, contact }),
   recordPayment: (customerName: string, contact: string, amount: number) =>
     call<PaymentResult>('recordPayment', { customerName, contact, amount }),

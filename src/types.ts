@@ -51,6 +51,8 @@ export interface Customer {
   balance: number;
   lastPurchase: string;
   status: string;
+  /** Drive file ID of the customer's photo, if one was added. */
+  photoId?: string;
 }
 
 export interface Expense {
@@ -175,4 +177,24 @@ export interface OpeningInput {
   owners: { username: string; capital: number; drawings: number }[];
   profitShare: Record<string, number>;
   overwrite?: boolean;
+}
+
+/** One day's sales totals from getSalesDaily. A sale with several items counts as several lines. */
+export interface SalesDay {
+  date: string;
+  total: number;
+  paid: number;
+  balance: number;
+  qty: number;
+  lines: number;
+}
+
+export interface SalesDailyResult {
+  from: string;
+  to: string;
+  /** Today in the sheet's time zone. */
+  today: string;
+  days: SalesDay[];
+  /** Only when includeLines was sent. Newest first. */
+  lines?: Sale[];
 }
