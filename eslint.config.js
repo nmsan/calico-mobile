@@ -7,4 +7,9 @@ module.exports = defineConfig([
   {
     ignores: ['dist/*'],
   },
+  {
+    // The API tests run under Node.
+    files: ['backend/test/**/*.js'],
+    languageOptions: { globals: { Buffer: 'readonly', __dirname: 'readonly' } },
+  },
 ]);
