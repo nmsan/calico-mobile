@@ -33,7 +33,8 @@
     "ios": "expo run:ios --port 8082",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "deploy:android": "bash scripts/deploy-android.sh"
   },
   "private": true
 }
