@@ -75,7 +75,7 @@ export const api = {
   logout: () => call<{ loggedOut: boolean }>('logout'),
   meta: () => call<Meta>('getMeta'),
 
-  inventory: () => call<{ lowStockLevel: number; items: InventoryItem[] }>('getInventory'),
+  inventory: () => call<{ lowStockLevel: number; salePricesSaved?: boolean; items: InventoryItem[] }>('getInventory'),
   addItem: (item: {
     itemId: string;
     category: string;
@@ -86,6 +86,16 @@ export const api = {
     sellingPrice: number;
     initialStock: number;
   }) => call<InventoryItem>('addInventoryItem', item),
+  updateItem: (item: {
+    itemId: string;
+    category: string;
+    name: string;
+    size: string;
+    color: string;
+    costPrice?: number;
+    sellingPrice?: number;
+    stock: number;
+  }) => call<InventoryItem>('updateInventoryItem', item),
   restock: (itemId: string, qty: number) => call<InventoryItem>('restockItem', { itemId, qty }),
 
   recordSale: (sale: { date?: string; customerName: string; contact: string; amountPaid: number; items: SaleLineInput[] }) =>

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Pressable, ScrollView, Text, View } from 'react-native';
 import { api } from '../api';
@@ -10,18 +10,40 @@ import { PhotoPicker } from '../components/PhotoPicker';
 import { setItemThumb, useItemThumbs, type PickedPhoto } from '../photos';
 import { DEFAULT_ITEM_SIZES, useItemSizes } from '../sizes';
 import { AutocompleteInput, useItemSuggestions } from '../suggestions';
+import type { StockStackParams } from '../navigation';
 import { colors } from '../theme';
 import { Button, Card, ErrorText, Input, Label, moneyShort, Screen, SectionLabel, success, tap, toNumber, ui, useToast } from '../ui';
 
+/** New item, or Edit item when opened with an item (the Item ID is then fixed). */
 export default function AddItemScreen() {
   const nav = useNavigation();
+  const route = useRoute<RouteProp<StockStackParams, 'EditItem'>>();
+  const editing = route.params?.item;
+  const pricesLocked = !!route.params?.pricesLocked;
   const toast = useToast();
   const headerHeight = useHeaderHeight();
-  const { categories, addCategory, removeCategory } = useItemCategories();
-  const { sizes, addSize, removeSize } = useItemSizes();
+  const { categories: savedCategories, addCategory, removeCategory } = useItemCategories();
+  const { sizes: savedSizes, addSize, removeSize } = useItemSizes();
+  // When editing, always offer the item's own category and size, even if this phone's lists lack them.
+  const withOwn = (list: string[], own?: string) => (own && !list.some((x) => x.toLowerCase() === own.toLowerCase()) ? [...list, own] : list);
+  const categories = withOwn(savedCategories, route.params?.item?.category);
+  const sizes = withOwn(savedSizes, route.params?.item?.size);
   const { itemNames, knownColors, itemDetails, saveSuggestion } = useItemSuggestions();
 
-  const [f, setF] = useState({ itemId: '', category: 'Tops', name: '', size: 'M', color: '', costPrice: '', sellingPrice: '', initialStock: '' });
+  const [f, setF] = useState(
+    editing
+      ? {
+          itemId: editing.itemId,
+          category: editing.category,
+          name: editing.name,
+          size: editing.size,
+          color: editing.color,
+          costPrice: editing.costPrice !== undefined ? String(editing.costPrice) : '',
+          sellingPrice: String(editing.sellingPrice),
+          initialStock: String(editing.currentStock),
+        }
+      : { itemId: '', category: 'Tops', name: '', size: 'M', color: '', costPrice: '', sellingPrice: '', initialStock: '' }
+  );
   const [showAddCat, setShowAddCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [showAddSize, setShowAddSize] = useState(false);
@@ -71,7 +93,19 @@ export default function AddItemScreen() {
     if (!Number.isInteger(stock) || stock < 0) return setError('Units in stock must be a whole number.');
     setBusy(true);
     try {
-      await api.addItem({ ...f, itemId: f.itemId.trim(), name: f.name.trim(), color: f.color.trim(), costPrice: cost, sellingPrice: price, initialStock: stock });
+      if (editing) {
+        await api.updateItem({
+          itemId: editing.itemId,
+          category: f.category,
+          name: f.name.trim(),
+          size: f.size,
+          color: f.color.trim(),
+          ...(pricesLocked ? {} : { costPrice: cost, sellingPrice: price }),
+          stock,
+        });
+      } else {
+        await api.addItem({ ...f, itemId: f.itemId.trim(), name: f.name.trim(), color: f.color.trim(), costPrice: cost, sellingPrice: price, initialStock: stock });
+      }
       void saveSuggestion(f.name.trim(), f.color.trim());
       let photoFailed = false;
       if (photo?.thumb) {
@@ -84,7 +118,11 @@ export default function AddItemScreen() {
       }
       success();
       toast(
-        photoFailed ? `${f.name.trim()} added, but the photo did not upload. Add it from Stock.` : `${f.name.trim()} added to stock.`,
+        photoFailed
+          ? `${f.name.trim()} saved, but the photo did not upload. Add it from Stock.`
+          : editing
+            ? `${f.name.trim()} updated.`
+            : `${f.name.trim()} added to stock.`,
         photoFailed ? 'error' : 'ok'
       );
       nav.goBack();
@@ -402,7 +440,8 @@ export default function AddItemScreen() {
               onChangeText={set('itemId')}
               placeholder="TOP-002-M-WHT"
               autoCapitalize="characters"
-              hint="Use one ID for each size and colour."
+              editable={!editing}
+              hint={editing ? "The ID can't change: past sales point to it." : 'Use one ID for each size and colour.'}
               style={{ marginBottom: 0 }}
             />
           </Card>
@@ -410,20 +449,35 @@ export default function AddItemScreen() {
           <Card>
             <SectionLabel style={{ marginBottom: 12 }}>Price and stock</SectionLabel>
             <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Input label="Cost price" prefix="Rs" value={f.costPrice} onChangeText={set('costPrice')} keyboardType="decimal-pad" style={{ flex: 1 }} />
-              <Input label="Selling price" prefix="Rs" value={f.sellingPrice} onChangeText={set('sellingPrice')} keyboardType="decimal-pad" style={{ flex: 1 }} />
+              <Input label="Cost price" prefix="Rs" value={f.costPrice} onChangeText={set('costPrice')} keyboardType="decimal-pad" editable={!pricesLocked} style={{ flex: 1 }} />
+              <Input label="Selling price" prefix="Rs" value={f.sellingPrice} onChangeText={set('sellingPrice')} keyboardType="decimal-pad" editable={!pricesLocked} style={{ flex: 1 }} />
             </View>
+            {pricesLocked ? (
+              <Text style={[ui.muted, { marginTop: -4, marginBottom: 14, fontSize: 13 }]}>
+                {"Prices are locked because this item has sales and the sheet still works out old sales from today's price. Run snapshotSalePrices once in the script editor to unlock price edits."}
+              </Text>
+            ) : editing && editing.unitsSold > 0 ? (
+              <Text style={[ui.muted, { marginTop: -4, marginBottom: 14, fontSize: 13 }]}>New prices apply to future sales. Past sales keep the price they were sold at.</Text>
+            ) : null}
             {margin !== null ? (
               <Text style={[ui.muted, { marginTop: -4, marginBottom: 14, color: margin < 0 ? colors.owed : colors.ok, fontWeight: '500' }]}>
                 {margin < 0 ? 'Selling below cost' : `Profit ${moneyShort(price - cost)} each · ${(margin * 100).toFixed(0)}% margin`}
               </Text>
             ) : null}
-            <Input label="Units in stock" value={f.initialStock} onChangeText={set('initialStock')} keyboardType="number-pad" placeholder="0" style={{ marginBottom: 0 }} />
+            <Input
+              label={editing ? 'Units in stock now' : 'Units in stock'}
+              value={f.initialStock}
+              onChangeText={set('initialStock')}
+              keyboardType="number-pad"
+              placeholder="0"
+              hint={editing ? 'What is on the shelf. Use this to correct a count; use Restock when new stock arrives.' : undefined}
+              style={{ marginBottom: 0 }}
+            />
           </Card>
 
           <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
             <ErrorText message={error} />
-            <Button title="Save item" onPress={save} loading={busy} style={{ marginTop: 8 }} />
+            <Button title={editing ? 'Save changes' : 'Save item'} onPress={save} loading={busy} style={{ marginTop: 8 }} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

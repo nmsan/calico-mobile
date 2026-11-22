@@ -18,10 +18,11 @@ import ReportsScreen from './screens/ReportsScreen';
 import SellScreen from './screens/SellScreen';
 import StockScreen from './screens/StockScreen';
 import { colors, fonts } from './theme';
-import { canManage } from './types';
+import { canManage, type InventoryItem } from './types';
 import { tap } from './ui';
 
-export type StockStackParams = { StockList: undefined; AddItem: undefined };
+/** EditItem reuses the New item form. `pricesLocked`: the item has sales and old sales still look up its price. */
+export type StockStackParams = { StockList: undefined; AddItem: undefined; EditItem: { item: InventoryItem; pricesLocked: boolean } };
 export type CustomersStackParams = { CustomerList: undefined; CustomerDetail: { name: string; contact: string; photoId?: string } };
 export type MoreStackParams = { MoreHome: undefined; Expenses: undefined; Reports: undefined; Owners: undefined; OpeningSetup: undefined };
 /** Reports, Owners & cash and Opening balances now live in the More stack. */
@@ -46,6 +47,7 @@ function StockNav() {
     <StockStack.Navigator screenOptions={header}>
       <StockStack.Screen name="StockList" component={StockScreen} options={{ headerShown: false }} />
       <StockStack.Screen name="AddItem" component={AddItemScreen} options={{ title: 'New item', ...detailHeader }} />
+      <StockStack.Screen name="EditItem" component={AddItemScreen} options={{ title: 'Edit item', ...detailHeader }} />
     </StockStack.Navigator>
   );
 }

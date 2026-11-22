@@ -19,6 +19,7 @@ import {
   Fab,
   groupRow,
   Input,
+  LinkButton,
   moneyShort,
   Screen,
   SearchField,
@@ -171,6 +172,10 @@ export default function StockScreen() {
       <RestockSheet
         item={restocking}
         thumb={restocking ? thumbOf(restocking.name, restocking.color) : undefined}
+        onEdit={(item) => {
+          setRestocking(null);
+          nav.navigate('EditItem', { item, pricesLocked: item.unitsSold > 0 && !data?.salePricesSaved });
+        }}
         onClose={() => setRestocking(null)}
         onDone={(updated) => {
           // Show the new count straight away, then refetch to pick up anything else that changed.
@@ -185,11 +190,13 @@ export default function StockScreen() {
 function RestockSheet({
   item,
   thumb,
+  onEdit,
   onClose,
   onDone,
 }: {
   item: InventoryItem | null;
   thumb?: Thumb;
+  onEdit: (item: InventoryItem) => void;
   onClose: () => void;
   onDone: (updated: InventoryItem) => void;
 }) {
@@ -272,7 +279,19 @@ function RestockSheet({
           onPicked={(p) => void savePhoto(p)}
           onRemove={() => void removePhoto()}
         />
-        <Text style={[ui.muted, { flex: 1, fontSize: 13 }]}>{thumb ? 'Tap the photo to change it. Every size in this colour shares it.' : 'Add a photo so staff can spot this piece at a glance.'}</Text>
+        <View style={{ flex: 1, gap: 8, alignItems: 'flex-start' }}>
+          <Text style={[ui.muted, { fontSize: 13 }]}>{thumb ? 'Tap the photo to change it. Every size in this colour shares it.' : 'Add a photo so staff can spot this piece at a glance.'}</Text>
+          <LinkButton
+            title="Edit details"
+            icon="create-outline"
+            onPress={() => {
+              if (!item) return;
+              setQty('');
+              setError(null);
+              onEdit(item);
+            }}
+          />
+        </View>
       </View>
       <Input label="Units received" value={qty} onChangeText={setQty} keyboardType="number-pad" large placeholder="0" />
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>

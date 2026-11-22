@@ -249,6 +249,7 @@ export function Input(props: {
   large?: boolean;
   hint?: string;
   maxLength?: number;
+  editable?: boolean;
   returnKeyType?: 'done' | 'next' | 'go';
   onSubmitEditing?: () => void;
   style?: StyleProp<ViewStyle>;
@@ -257,10 +258,10 @@ export function Input(props: {
   return (
     <View style={[{ marginBottom: 14 }, props.style]}>
       {props.label ? <Label>{props.label}</Label> : null}
-      <View style={[ui.inputBox, focused && ui.inputFocused]}>
+      <View style={[ui.inputBox, focused && ui.inputFocused, props.editable === false && { backgroundColor: colors.paper }]}>
         {props.prefix ? <Text style={[ui.prefix, props.large && { fontSize: 22 }]}>{props.prefix}</Text> : null}
         <TextInput
-          style={[ui.input, props.large && ui.inputLarge]}
+          style={[ui.input, props.large && ui.inputLarge, props.editable === false && { color: colors.muted }]}
           value={props.value}
           onChangeText={props.onChangeText}
           placeholder={props.placeholder}
@@ -271,6 +272,7 @@ export function Input(props: {
           autoCorrect={false}
           autoFocus={props.autoFocus}
           maxLength={props.maxLength}
+          editable={props.editable}
           returnKeyType={props.returnKeyType}
           onSubmitEditing={props.onSubmitEditing}
           onFocus={() => setFocused(true)}
