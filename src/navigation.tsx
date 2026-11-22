@@ -10,14 +10,18 @@ import AddItemScreen from './screens/AddItemScreen';
 import CustomerDetailScreen from './screens/CustomerDetailScreen';
 import CustomersScreen from './screens/CustomersScreen';
 import ExpensesScreen from './screens/ExpensesScreen';
+import OpeningSetupScreen from './screens/OpeningSetupScreen';
+import OwnersScreen from './screens/OwnersScreen';
 import ReportsScreen from './screens/ReportsScreen';
 import SellScreen from './screens/SellScreen';
 import StockScreen from './screens/StockScreen';
 import { colors, fonts } from './theme';
+import { canManage } from './types';
 import { Avatar, Button, Sheet, initials, tap } from './ui';
 
 export type StockStackParams = { StockList: undefined; AddItem: undefined };
 export type CustomersStackParams = { CustomerList: undefined; CustomerDetail: { name: string; contact: string } };
+export type ReportsStackParams = { ReportsHome: undefined; Owners: undefined; OpeningSetup: undefined };
 
 /** Header button with the user's initials. Opens the account sheet (who is signed in, sign out). */
 function AccountButton() {
@@ -53,7 +57,7 @@ function AccountButton() {
           <Avatar name={name} size={52} />
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 18, fontWeight: '600', color: colors.ink }}>{name}</Text>
-            <Text style={{ fontSize: 14, color: colors.muted, marginTop: 2 }}>{user?.role === 'owner' ? 'Owner' : 'Staff'}</Text>
+            <Text style={{ fontSize: 14, color: colors.muted, marginTop: 2 }}>{user?.role === 'admin' ? 'Admin' : user?.role === 'owner' ? 'Owner' : 'Staff'}</Text>
           </View>
           <ShellMark size={36} />
         </View>
@@ -106,6 +110,17 @@ function CustomersNav() {
   );
 }
 
+const RepStack = createNativeStackNavigator<ReportsStackParams>();
+function ReportsNav() {
+  return (
+    <RepStack.Navigator screenOptions={header}>
+      <RepStack.Screen name="ReportsHome" component={ReportsScreen} options={{ headerShown: false }} />
+      <RepStack.Screen name="Owners" component={OwnersScreen} options={{ title: 'Owners & cash', ...detailHeader }} />
+      <RepStack.Screen name="OpeningSetup" component={OpeningSetupScreen} options={{ title: 'Opening balances', ...detailHeader }} />
+    </RepStack.Navigator>
+  );
+}
+
 /** Show the tab header only while the stack is on its first screen. */
 const rootHeaderOnly = (rootName: string) => ({ route }: { route: Parameters<typeof getFocusedRouteNameFromRoute>[0] }) => ({
   headerShown: (getFocusedRouteNameFromRoute(route) ?? rootName) === rootName,
@@ -121,7 +136,7 @@ const Tabs = createBottomTabNavigator();
 
 export function MainTabs() {
   const { user } = useAuth();
-  const isOwner = user?.role === 'owner';
+  const isOwner = canManage(user?.role);
   return (
     <Tabs.Navigator
       screenOptions={{
@@ -148,7 +163,11 @@ export function MainTabs() {
       {isOwner ? (
         <>
           <Tabs.Screen name="Expenses" component={ExpensesScreen} options={{ tabBarIcon: icon('wallet') }} />
-          <Tabs.Screen name="Reports" component={ReportsScreen} options={{ tabBarIcon: icon('stats-chart') }} />
+          <Tabs.Screen
+            name="Reports"
+            component={ReportsNav}
+            options={(p) => ({ ...rootHeaderOnly('ReportsHome')(p), tabBarIcon: icon('stats-chart') })}
+          />
         </>
       ) : null}
     </Tabs.Navigator>

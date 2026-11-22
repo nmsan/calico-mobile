@@ -4,6 +4,11 @@ import type {
   Expense,
   InventoryItem,
   Meta,
+  OpeningBalances,
+  OpeningInput,
+  OwnerSummary,
+  OwnerTransaction,
+  OwnerTxType,
   PaymentResult,
   RecordSaleResult,
   Sale,
@@ -95,4 +100,13 @@ export const api = {
   expenses: (limit = 100) => call<Expense[]>('getExpenses', { limit }),
   addExpense: (e: { date?: string; category: string; description: string; amount: number; method: string }) =>
     call<Expense>('addExpense', e),
+
+  ownerSummary: () => call<OwnerSummary>('getOwnerSummary'),
+  previewOpening: (o: OpeningInput) => call<OpeningBalances>('saveOpeningBalances', { ...o, preview: true }),
+  saveOpening: (o: OpeningInput) => call<OpeningBalances>('saveOpeningBalances', { ...o }),
+  setStockCounts: (counts: { itemId: string; qty: number }[]) => call<InventoryItem[]>('setStockCounts', { counts }),
+  ownerTransactions: (owner?: string, limit = 200) =>
+    call<OwnerTransaction[]>('getOwnerTransactions', owner ? { owner, limit } : { limit }),
+  addOwnerTransaction: (t: { date?: string; owner: string; type: OwnerTxType; amount: number; method: string; note: string }) =>
+    call<OwnerTransaction>('addOwnerTransaction', t),
 };

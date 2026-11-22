@@ -1,4 +1,7 @@
-export type Role = 'owner' | 'staff';
+export type Role = 'admin' | 'owner' | 'staff';
+
+/** Admins and owners see everything; staff only sell and view. */
+export const canManage = (role: Role | undefined) => role === 'admin' || role === 'owner';
 
 export interface User {
   username: string;
@@ -105,4 +108,71 @@ export interface RecordSaleResult {
 export interface PaymentResult {
   applied: { row: number; itemName: string; date: string; applied: number }[];
   remainingBalance: number;
+}
+
+export type OwnerTxType = 'Capital in' | 'Drawing';
+
+export interface OwnerTransaction {
+  row: number;
+  date: string;
+  owner: string;
+  type: OwnerTxType;
+  amount: number;
+  method: string;
+  note: string;
+  enteredBy: string;
+}
+
+/** The go-live snapshot: what the business had when it started using the app. */
+export interface OpeningBalances {
+  date: string;
+  cash: number;
+  stockValue: number;
+  receivable: number;
+  capital: number;
+  drawings: number;
+  /** Profit made before the app that nobody recorded (the balancing figure). */
+  pastProfit: number;
+  owners: { username: string; capital: number; drawings: number }[];
+  profitShare: Record<string, number>;
+  savedBy: string;
+  savedAt: string;
+  preview?: boolean;
+}
+
+export interface PartnerBalance {
+  username: string;
+  sharePercent: number;
+  openingCapital: number;
+  capitalIn: number;
+  openingDrawings: number;
+  drawings: number;
+  profitShare: number;
+  balance: number;
+}
+
+export interface OwnerSummary {
+  opening: OpeningBalances | null;
+  owners: string[];
+  partners: PartnerBalance[];
+  totals: {
+    netRevenue: number;
+    cogs: number;
+    expenses: number;
+    profitSince: number;
+    pastProfit: number;
+    cashCollected: number;
+    capitalIn: number;
+    drawings: number;
+    cashEstimate: number;
+    equity: number;
+  } | null;
+}
+
+export interface OpeningInput {
+  date: string;
+  cash: number;
+  owners: { username: string; capital: number; drawings: number }[];
+  profitShare: Record<string, number>;
+  overwrite?: boolean;
 }

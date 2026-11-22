@@ -1,7 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { api } from '../api';
+import type { ReportsStackParams } from '../navigation';
 import type { DashboardNumbers } from '../types';
 import { colors } from '../theme';
 import { Card, Divider, ErrorText, Hero, KeyValue, Loading, money, pct, Screen, SectionLabel, Segmented, tap, ui, useLoader } from '../ui';
@@ -71,6 +74,7 @@ export default function ReportsScreen() {
           <ErrorText message={error} />
         </View>
 
+        <OwnersCard />
         {!data && loading ? <Loading /> : null}
         {n ? (
           <>
@@ -107,6 +111,37 @@ export default function ReportsScreen() {
         ) : null}
       </ScrollView>
     </Screen>
+  );
+}
+
+/** Link to partner balances and cash; asks for the opening setup until it is done. */
+function OwnersCard() {
+  const nav = useNavigation<NativeStackNavigationProp<ReportsStackParams>>();
+  const { data } = useLoader(() => api.ownerSummary());
+  if (!data) return null;
+  const t = data.totals;
+  const open = () => {
+    tap();
+    nav.navigate(data.opening ? 'Owners' : 'OpeningSetup');
+  };
+  return (
+    <Pressable onPress={open} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
+      <Card style={!data.opening ? { borderColor: colors.rust, borderWidth: 1 } : undefined}>
+        <View style={ui.between}>
+          <View style={{ flex: 1, paddingRight: 12 }}>
+            <SectionLabel>{data.opening ? 'Owners & cash' : 'Set opening balances'}</SectionLabel>
+            {data.opening && t ? (
+              <Text style={{ fontSize: 15, color: colors.ink, marginTop: 4 }}>
+                Cash about {money(t.cashEstimate)} · taken {money(t.drawings)}
+              </Text>
+            ) : (
+              <Text style={[ui.muted, { fontSize: 14 }]}>Enter stock, cash and what each partner put in and took out before the app.</Text>
+            )}
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.muted} />
+        </View>
+      </Card>
+    </Pressable>
   );
 }
 

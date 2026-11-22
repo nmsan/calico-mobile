@@ -156,9 +156,9 @@ export default function SellScreen() {
                   <View style={{ paddingVertical: 12 }}>
                     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={ui.rowTitle}>{l.item.name}</Text>
-                        <Text style={ui.muted}>
-                          {l.item.size} / {l.item.color} · {moneyShort(l.item.sellingPrice)} each
+                        <Text style={ui.rowTitle} numberOfLines={1}>{l.item.name}</Text>
+                        <Text style={ui.muted} numberOfLines={1}>
+                          {l.item.itemId} · {l.item.size} / {l.item.color} · {moneyShort(l.item.sellingPrice)} each
                         </Text>
                       </View>
                       <Pressable
@@ -294,10 +294,10 @@ export default function SellScreen() {
           return (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={ui.rowTitle}>{i.name}</Text>
-                <Text style={ui.muted}>
-                  {i.size} / {i.color} · {moneyShort(i.sellingPrice)}
-                  {inCart ? ` · ${inCart} in this sale` : ''}
+                <Text style={ui.rowTitle} numberOfLines={1}>{i.name}</Text>
+                <Text style={ui.muted} numberOfLines={1}>
+                  {i.itemId} · {i.size} / {i.color} · {moneyShort(i.sellingPrice)}
+                  {inCart ? ` · ${inCart} in sale` : ''}
                 </Text>
               </View>
               <Badge

@@ -5,7 +5,7 @@ import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import type { StockStackParams } from '../navigation';
-import type { InventoryItem } from '../types';
+import { canManage, type InventoryItem } from '../types';
 import { colors } from '../theme';
 import {
   Badge,
@@ -32,7 +32,7 @@ const FILTERS = ['All', 'Low', 'Out'];
 
 export default function StockScreen() {
   const { user } = useAuth();
-  const isOwner = user?.role === 'owner';
+  const isOwner = canManage(user?.role);
   const nav = useNavigation<NativeStackNavigationProp<StockStackParams>>();
   const { data, error, loading, reload, setData } = useLoader(() => api.inventory());
   const [q, setQ] = useState('');
