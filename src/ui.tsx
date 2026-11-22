@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   KeyboardTypeOptions,
@@ -20,6 +21,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePhoto } from './photos';
 import { colors, fonts, radius } from './theme';
 
 export { colors, fonts } from './theme';
@@ -465,12 +467,20 @@ export function LinkButton({ title, onPress, icon, color = colors.rust }: { titl
   );
 }
 
-/** Floating action button, bottom right. */
-export function Fab({ title, icon = 'add', onPress }: { title: string; icon?: IconName; onPress: () => void }) {
+/**
+ * Floating action button, bottom right. With `iconOnly` it is a round icon button and `title`
+ * is only read out by screen readers.
+ */
+export function Fab({ title, icon = 'add', iconOnly, onPress }: { title: string; icon?: IconName; iconOnly?: boolean; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [ui.fab, pressed && { opacity: 0.85 }]}>
-      <Ionicons name={icon} size={20} color="#fff" />
-      <Text style={ui.fabText}>{title}</Text>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={({ pressed }) => [ui.fab, iconOnly && ui.fabRound, pressed && { opacity: 0.85 }]}
+    >
+      <Ionicons name={icon} size={iconOnly ? 28 : 20} color="#fff" />
+      {iconOnly ? null : <Text style={ui.fabText}>{title}</Text>}
     </Pressable>
   );
 }
@@ -502,10 +512,19 @@ export function Badge({ text, tone, style }: { text: string; tone?: Tone; style?
   );
 }
 
-export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+/** Customer photo when there is one (`photoId` from the server, or a local `uri`), else initials. */
+export function Avatar({ name, size = 40, photoId, uri }: { name: string; size?: number; photoId?: string; uri?: string | null }) {
+  const remote = usePhoto(uri ? undefined : photoId);
+  const src = uri ?? remote;
+  const box = { width: size, height: size, borderRadius: size / 2 };
+  if (src) return <Image source={{ uri: src }} style={[box, { backgroundColor: colors.shell }]} accessibilityLabel={`Photo of ${name}`} />;
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.shell, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ color: colors.rust, fontWeight: '700', fontSize: size * 0.36 }}>{initials(name)}</Text>
+    <View style={[box, { backgroundColor: colors.shell, alignItems: 'center', justifyContent: 'center' }]}>
+      {name.trim() ? (
+        <Text style={{ color: colors.rust, fontWeight: '700', fontSize: size * 0.36 }}>{initials(name)}</Text>
+      ) : (
+        <Ionicons name="person" size={size * 0.46} color={colors.sand} />
+      )}
     </View>
   );
 }
@@ -790,6 +809,7 @@ export const ui = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
+  fabRound: { width: 58, height: 58, borderRadius: 29, paddingHorizontal: 0, paddingVertical: 0, justifyContent: 'center' },
   fabText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   badge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.pill },
   badgeText: { fontSize: 12, fontWeight: '600' },

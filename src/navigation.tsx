@@ -1,15 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, type BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import React from 'react';
+import { Pressable, View } from 'react-native';
 import { useAuth } from './auth';
 import { ShellMark } from './brand';
 import AddItemScreen from './screens/AddItemScreen';
 import CustomerDetailScreen from './screens/CustomerDetailScreen';
 import CustomersScreen from './screens/CustomersScreen';
 import ExpensesScreen from './screens/ExpensesScreen';
+import HomeScreen from './screens/HomeScreen';
+import MoreScreen from './screens/MoreScreen';
 import OpeningSetupScreen from './screens/OpeningSetupScreen';
 import OwnersScreen from './screens/OwnersScreen';
 import ReportsScreen from './screens/ReportsScreen';
@@ -17,63 +19,13 @@ import SellScreen from './screens/SellScreen';
 import StockScreen from './screens/StockScreen';
 import { colors, fonts } from './theme';
 import { canManage } from './types';
-import { Avatar, Button, Sheet, initials, tap } from './ui';
+import { tap } from './ui';
 
 export type StockStackParams = { StockList: undefined; AddItem: undefined };
-export type CustomersStackParams = { CustomerList: undefined; CustomerDetail: { name: string; contact: string } };
-export type ReportsStackParams = { ReportsHome: undefined; Owners: undefined; OpeningSetup: undefined };
-
-/** Header button with the user's initials. Opens the account sheet (who is signed in, sign out). */
-function AccountButton() {
-  const { user, signOut } = useAuth();
-  const [open, setOpen] = useState(false);
-  const name = user?.username ?? '';
-  return (
-    <>
-      <Pressable
-        onPress={() => {
-          tap();
-          setOpen(true);
-        }}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel="Account"
-        style={({ pressed }) => ({
-          width: 34,
-          height: 34,
-          borderRadius: 17,
-          backgroundColor: colors.shell,
-          borderWidth: 1,
-          borderColor: colors.line,
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: pressed ? 0.7 : 1,
-        })}
-      >
-        <Text style={{ color: colors.rust, fontWeight: '700', fontSize: 12 }}>{initials(name)}</Text>
-      </Pressable>
-      <Sheet visible={open} title="Account" onClose={() => setOpen(false)}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-          <Avatar name={name} size={52} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 18, fontWeight: '600', color: colors.ink }}>{name}</Text>
-            <Text style={{ fontSize: 14, color: colors.muted, marginTop: 2 }}>{user?.role === 'admin' ? 'Admin' : user?.role === 'owner' ? 'Owner' : 'Staff'}</Text>
-          </View>
-          <ShellMark size={36} />
-        </View>
-        <Button
-          title="Sign out"
-          variant="secondary"
-          icon="log-out-outline"
-          onPress={() => {
-            setOpen(false);
-            void signOut();
-          }}
-        />
-      </Sheet>
-    </>
-  );
-}
+export type CustomersStackParams = { CustomerList: undefined; CustomerDetail: { name: string; contact: string; photoId?: string } };
+export type MoreStackParams = { MoreHome: undefined; Expenses: undefined; Reports: undefined; Owners: undefined; OpeningSetup: undefined };
+/** Reports, Owners & cash and Opening balances now live in the More stack. */
+export type ReportsStackParams = MoreStackParams;
 
 const header = {
   headerStyle: { backgroundColor: colors.paper },
@@ -84,10 +36,8 @@ const header = {
   headerBackButtonDisplayMode: 'minimal' as const,
 };
 
-const withAccount = { headerRight: () => <AccountButton />, headerRightContainerStyle: { paddingRight: 16 } };
-
-// Stack roots use the tab navigator's header (left-aligned serif title, account button) so every
-// tab looks the same; pushed screens use the native stack header with a back button.
+// Stack roots use the tab navigator's header (left-aligned serif title) so every tab looks the
+// same; pushed screens use the native stack header with a back button.
 const detailHeader = { headerTitleStyle: { ...header.headerTitleStyle, fontSize: 19 } };
 
 const StockStack = createNativeStackNavigator<StockStackParams>();
@@ -110,14 +60,22 @@ function CustomersNav() {
   );
 }
 
-const RepStack = createNativeStackNavigator<ReportsStackParams>();
-function ReportsNav() {
+const MoreStack = createNativeStackNavigator<MoreStackParams>();
+function MoreNav() {
+  const { user } = useAuth();
+  const isOwner = canManage(user?.role);
   return (
-    <RepStack.Navigator screenOptions={header}>
-      <RepStack.Screen name="ReportsHome" component={ReportsScreen} options={{ headerShown: false }} />
-      <RepStack.Screen name="Owners" component={OwnersScreen} options={{ title: 'Owners & cash', ...detailHeader }} />
-      <RepStack.Screen name="OpeningSetup" component={OpeningSetupScreen} options={{ title: 'Opening balances', ...detailHeader }} />
-    </RepStack.Navigator>
+    <MoreStack.Navigator screenOptions={header}>
+      <MoreStack.Screen name="MoreHome" component={MoreScreen} options={{ headerShown: false }} />
+      {isOwner ? (
+        <>
+          <MoreStack.Screen name="Expenses" component={ExpensesScreen} options={detailHeader} />
+          <MoreStack.Screen name="Reports" component={ReportsScreen} options={detailHeader} />
+          <MoreStack.Screen name="Owners" component={OwnersScreen} options={{ title: 'Owners & cash', ...detailHeader }} />
+          <MoreStack.Screen name="OpeningSetup" component={OpeningSetupScreen} options={{ title: 'Opening balances', ...detailHeader }} />
+        </>
+      ) : null}
+    </MoreStack.Navigator>
   );
 }
 
@@ -132,16 +90,58 @@ const icon = (name: string) =>
     return <Ionicons name={(focused ? name : `${name}-outline`) as IconName} color={color} size={23} />;
   };
 
+const HOME_SIZE = 62;
+
+/**
+ * Home sits in the middle of the bar as the Calico shell, raised above the bar so it reads as the
+ * app's anchor. A rust ring shows when Home is the current tab.
+ */
+function HomeTabButton({ onPress, onLongPress, 'aria-selected': selected }: BottomTabBarButtonProps) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }} pointerEvents="box-none">
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        accessibilityRole="tab"
+        accessibilityLabel="Home"
+        accessibilityState={{ selected: !!selected }}
+        hitSlop={6}
+        style={({ pressed }) => ({
+          width: HOME_SIZE,
+          height: HOME_SIZE,
+          borderRadius: HOME_SIZE / 2,
+          marginTop: -HOME_SIZE / 3,
+          backgroundColor: colors.surface,
+          borderWidth: selected ? 2 : 1,
+          borderColor: selected ? colors.rust : colors.line,
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: colors.ink,
+          shadowOpacity: 0.12,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 3 },
+          elevation: 6,
+          transform: [{ scale: pressed ? 0.94 : 1 }],
+        })}
+      >
+        <ShellMark size={36} />
+      </Pressable>
+    </View>
+  );
+}
+
 const Tabs = createBottomTabNavigator();
 
+/**
+ * Five slots: the everyday jobs either side of Home, and More for less frequent tools
+ * (expenses, reports, owners, account). Sell sits next to Home so the main job is one thumb away.
+ */
 export function MainTabs() {
-  const { user } = useAuth();
-  const isOwner = canManage(user?.role);
   return (
     <Tabs.Navigator
+      initialRouteName="Home"
       screenOptions={{
         ...header,
-        ...withAccount,
         tabBarActiveTintColor: colors.rust,
         tabBarInactiveTintColor: colors.muted,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line },
@@ -149,27 +149,23 @@ export function MainTabs() {
       }}
       screenListeners={{ tabPress: () => tap() }}
     >
-      <Tabs.Screen name="Sell" component={SellScreen} options={{ title: 'New sale', tabBarLabel: 'Sell', tabBarIcon: icon('bag-handle') }} />
       <Tabs.Screen
         name="Stock"
         component={StockNav}
         options={(p) => ({ ...rootHeaderOnly('StockList')(p), tabBarIcon: icon('shirt') })}
       />
+      <Tabs.Screen name="Sell" component={SellScreen} options={{ title: 'New sale', tabBarLabel: 'Sell', tabBarIcon: icon('bag-handle') }} />
+      <Tabs.Screen name="Home" component={HomeScreen} options={{ title: 'Home', tabBarButton: (props) => <HomeTabButton {...props} /> }} />
       <Tabs.Screen
         name="Customers"
         component={CustomersNav}
         options={(p) => ({ ...rootHeaderOnly('CustomerList')(p), tabBarIcon: icon('people') })}
       />
-      {isOwner ? (
-        <>
-          <Tabs.Screen name="Expenses" component={ExpensesScreen} options={{ tabBarIcon: icon('wallet') }} />
-          <Tabs.Screen
-            name="Reports"
-            component={ReportsNav}
-            options={(p) => ({ ...rootHeaderOnly('ReportsHome')(p), tabBarIcon: icon('stats-chart') })}
-          />
-        </>
-      ) : null}
+      <Tabs.Screen
+        name="More"
+        component={MoreNav}
+        options={(p) => ({ ...rootHeaderOnly('MoreHome')(p), tabBarIcon: icon('grid') })}
+      />
     </Tabs.Navigator>
   );
 }

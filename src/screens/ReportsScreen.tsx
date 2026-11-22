@@ -5,23 +5,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { api } from '../api';
 import type { ReportsStackParams } from '../navigation';
+import { monthLabel, monthStr, shiftPeriod } from '../dates';
 import type { DashboardNumbers } from '../types';
 import { colors } from '../theme';
 import { Card, Divider, ErrorText, Hero, KeyValue, Loading, money, pct, Screen, SectionLabel, Segmented, tap, ui, useLoader } from '../ui';
 
 type View_ = 'month' | 'all';
 
-function monthStr(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
 function shiftMonth(m: string, by: number) {
-  const [y, mo] = m.split('-').map(Number);
-  return monthStr(new Date(y, mo - 1 + by, 1));
-}
-function monthLabel(m: string) {
-  const [y, mo] = m.split('-').map(Number);
-  const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  return `${names[mo - 1]} ${y}`;
+  return shiftPeriod('month', `${m}-01`, by).slice(0, 7);
 }
 
 export default function ReportsScreen() {

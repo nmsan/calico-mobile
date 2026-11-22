@@ -2,10 +2,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useLayoutEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { api } from '../api';
+import { PhotoPicker } from '../components/PhotoPicker';
+import { rememberPhoto, type PickedPhoto } from '../photos';
 import type { CustomersStackParams } from '../navigation';
 import { colors } from '../theme';
 import {
-  Avatar,
   Badge,
   Button,
   Card,
@@ -30,6 +31,8 @@ type Props = NativeStackScreenProps<CustomersStackParams, 'CustomerDetail'>;
 
 export default function CustomerDetailScreen({ route, navigation }: Props) {
   const { name, contact } = route.params;
+  const [photoId, setPhotoId] = useState(route.params.photoId);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const toast = useToast();
   const { data, error, loading, reload } = useLoader(() => api.customerSales(name, contact));
   const [paying, setPaying] = useState(false);
@@ -44,6 +47,34 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
   const sales = data ?? [];
   const owed = Math.round(sales.reduce((s, x) => s + Math.max(0, x.balance), 0) * 100) / 100;
   const spent = sales.reduce((s, x) => s + x.total, 0);
+
+  async function savePhoto(photo: PickedPhoto) {
+    setPhotoBusy(true);
+    try {
+      const r = await api.setCustomerPhoto(name, contact, photo.base64);
+      rememberPhoto(r.photoId, photo.base64);
+      setPhotoId(r.photoId);
+      success();
+      toast('Photo saved.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'error');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto() {
+    setPhotoBusy(true);
+    try {
+      await api.removeCustomerPhoto(name, contact);
+      setPhotoId(undefined);
+      toast('Photo removed.');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : String(e), 'error');
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
 
   function closePay() {
     setPaying(false);
@@ -73,8 +104,8 @@ export default function CustomerDetailScreen({ route, navigation }: Props) {
   const header = (
     <View>
       <Card style={{ marginTop: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-          <Avatar name={name} size={48} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+          <PhotoPicker name={name} size={64} photoId={photoId} busy={photoBusy} onPicked={(p) => void savePhoto(p)} onRemove={() => void removePhoto()} />
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 18, fontWeight: '600', color: colors.ink }}>{name}</Text>
             <Text style={ui.muted}>{contact || 'No phone saved'}</Text>

@@ -109,7 +109,7 @@ export default function StockScreen() {
           loading ? undefined : query || filter !== 'All' ? (
             <Empty icon="search" text="No items match. Try another search or filter." />
           ) : (
-            <Empty icon="shirt-outline" title="No stock yet" text={isOwner ? 'Tap New item to add your first piece.' : 'Items the owner adds will show here.'} />
+            <Empty icon="shirt-outline" title="No stock yet" text={isOwner ? 'Tap + to add your first piece.' : 'Items the owner adds will show here.'} />
           )
         }
         contentContainerStyle={{ paddingBottom: isOwner ? 96 : 24 }}
@@ -148,7 +148,7 @@ export default function StockScreen() {
           );
         }}
       />
-      {isOwner ? <Fab title="New item" onPress={() => nav.navigate('AddItem')} /> : null}
+      {isOwner ? <Fab title="New item" iconOnly onPress={() => nav.navigate('AddItem')} /> : null}
       <RestockSheet
         item={restocking}
         onClose={() => setRestocking(null)}

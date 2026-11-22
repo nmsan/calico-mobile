@@ -324,7 +324,7 @@ export default function SellScreen() {
         }}
         renderRow={(c) => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Avatar name={c.name} size={36} />
+            <Avatar name={c.name} size={36} photoId={c.photoId} />
             <View style={{ flex: 1 }}>
               <Text style={ui.rowTitle}>{c.name}</Text>
               <Text style={ui.muted}>{c.contact || 'No phone'}</Text>

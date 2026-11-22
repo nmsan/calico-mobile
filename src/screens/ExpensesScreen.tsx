@@ -71,7 +71,7 @@ export default function ExpensesScreen() {
             {rows.length ? <SectionLabel style={{ marginHorizontal: 16, marginTop: 20, marginBottom: 10 }}>Recent</SectionLabel> : null}
           </View>
         }
-        ListEmptyComponent={loading ? undefined : <Empty icon="wallet-outline" title="No expenses yet" text="Tap Add expense to record rent, packaging, shipping and other costs." />}
+        ListEmptyComponent={loading ? undefined : <Empty icon="wallet-outline" title="No expenses yet" text="Tap + to record rent, packaging, shipping and other costs." />}
         contentContainerStyle={{ paddingBottom: 96 }}
         renderItem={({ item: e, index }) => (
           <View style={[groupRow(index, rows.length), { gap: 12 }]}>
@@ -90,7 +90,7 @@ export default function ExpensesScreen() {
           </View>
         )}
       />
-      <Fab title="Add expense" onPress={() => setAdding(true)} />
+      <Fab title="Add expense" iconOnly onPress={() => setAdding(true)} />
       <AddExpenseSheet
         visible={adding}
         onClose={() => setAdding(false)}
@@ -103,7 +103,8 @@ export default function ExpensesScreen() {
   );
 }
 
-function AddExpenseSheet({ visible, onClose, onSaved }: { visible: boolean; onClose: () => void; onSaved: () => void }) {
+/** Form for one expense. Also opened from the Home shortcut. */
+export function AddExpenseSheet({ visible, onClose, onSaved }: { visible: boolean; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
   const [category, setCategory] = useState('Packaging');
   const [method, setMethod] = useState('Cash');
