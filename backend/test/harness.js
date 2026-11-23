@@ -141,7 +141,7 @@ function makeContext() {
       base64Decode: (s) => { if (!/^[A-Za-z0-9+/=]+$/.test(s)) throw new Error('bad base64'); return Array.from(Buffer.from(s, 'base64')); },
       base64Encode: (b) => Buffer.from(b).toString('base64'),
       newBlob: (bytes, type, name) => ({ bytes, type, name, getBytes: () => bytes, getContentType: () => type }),
-      formatDate: (d) => d.toISOString().slice(0, 10),
+      formatDate: (d, tz, f) => (f === 'HH:mm' ? d.toISOString().slice(11, 16) : d.toISOString().slice(0, 10)),
     },
     PropertiesService: { getScriptProperties: () => ({
       getProperty: (k) => (k in props ? props[k] : null), setProperty: (k, v) => { props[k] = v; },

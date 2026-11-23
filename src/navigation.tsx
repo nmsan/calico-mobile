@@ -11,6 +11,7 @@ import CustomerDetailScreen from './screens/CustomerDetailScreen';
 import CustomersScreen from './screens/CustomersScreen';
 import ExpensesScreen from './screens/ExpensesScreen';
 import HomeScreen from './screens/HomeScreen';
+import ItemHistoryScreen from './screens/ItemHistoryScreen';
 import MoreScreen from './screens/MoreScreen';
 import OpeningSetupScreen from './screens/OpeningSetupScreen';
 import OwnersScreen from './screens/OwnersScreen';
@@ -25,7 +26,13 @@ import { canManage, type InventoryItem } from './types';
 import { tap } from './ui';
 
 /** EditItem reuses the New item form. `pricesLocked`: the item has sales and old sales still look up its price. */
-export type StockStackParams = { StockList: undefined; AddItem: undefined; EditItem: { item: InventoryItem; pricesLocked: boolean } };
+export type StockStackParams = {
+  StockList: undefined;
+  AddItem: undefined;
+  EditItem: { item: InventoryItem; pricesLocked: boolean };
+  ItemHistory: { item: InventoryItem };
+  SaleDetail: { invoice: Invoice; photoId?: string };
+};
 export type CustomersStackParams = { CustomerList: undefined; CustomerDetail: { name: string; contact: string; photoId?: string } };
 /** SaleDetail shows one sale as an invoice. */
 export type SalesStackParams = { SalesList: undefined; NewSale: undefined; SaleDetail: { invoice: Invoice; photoId?: string } };
@@ -53,6 +60,8 @@ function StockNav() {
       <StockStack.Screen name="StockList" component={StockScreen} options={{ headerShown: false }} />
       <StockStack.Screen name="AddItem" component={AddItemScreen} options={{ title: 'New item', ...detailHeader }} />
       <StockStack.Screen name="EditItem" component={AddItemScreen} options={{ title: 'Edit item', ...detailHeader }} />
+      <StockStack.Screen name="ItemHistory" component={ItemHistoryScreen} options={{ title: 'Item history', ...detailHeader }} />
+      <StockStack.Screen name="SaleDetail" component={SaleDetailScreen} options={{ title: 'Invoice', ...detailHeader }} />
     </StockStack.Navigator>
   );
 }

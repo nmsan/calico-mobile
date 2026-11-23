@@ -23,6 +23,27 @@ export interface InventoryItem {
   status: string;
 }
 
+/** One logged change to a stock item (Stock History tab). */
+export interface ItemEvent {
+  date: string;
+  time: string;
+  event: 'Created' | 'Restocked' | 'Stock count' | 'Edited' | 'Photo added' | 'Photo changed' | 'Photo removed' | string;
+  change: number | null;
+  stockAfter: number | null;
+  details: string;
+  ownerDetails?: string; // cost changes, owners only
+  by: string;
+}
+
+export interface ItemHistory {
+  item: InventoryItem;
+  events: ItemEvent[];
+  /** Every invoice that includes this item, each as all of its sale lines. */
+  invoices: Sale[][];
+  /** Stock from before history was kept. */
+  openingStock: number;
+}
+
 export interface Sale {
   row: number;
   date: string;

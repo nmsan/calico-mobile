@@ -59,6 +59,7 @@ const ROUTES = {
   restockItem: { roles: [ROLES.OWNER], fn: actionRestockItem },
   updateInventoryItem: { roles: [ROLES.OWNER], fn: actionUpdateInventoryItem },
   getItemThumbs: { roles: [ROLES.OWNER, ROLES.STAFF], fn: actionGetItemThumbs },
+  getItemHistory: { roles: [ROLES.OWNER, ROLES.STAFF], fn: actionGetItemHistory },
   getItemPhoto: { roles: [ROLES.OWNER, ROLES.STAFF], fn: actionGetItemPhoto },
   setItemPhoto: { roles: [ROLES.OWNER], fn: actionSetItemPhoto },
   removeItemPhoto: { roles: [ROLES.OWNER], fn: actionRemoveItemPhoto },
@@ -332,6 +333,12 @@ function round2(n) {
   return Math.round(num(n) * 100) / 100;
 }
 
+/** 1500 -> "Rs 1,500.00", for history notes. */
+function rs(n) {
+  const v = round2(n).toFixed(2).split('.');
+  return 'Rs ' + v[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + v[1];
+}
+
 function todayStr() {
   return Utilities.formatDate(new Date(), SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
 }
@@ -412,7 +419,7 @@ function actionGetInventory(p, user) {
   return { lowStockLevel: lowStockLevel(), salePricesSaved: salePricesSaved(), items: inventoryRows(canSeeCosts(user)) };
 }
 
-function actionAddInventoryItem(p) {
+function actionAddInventoryItem(p, user) {
   const itemId = String(p.itemId || '').trim();
   const name = String(p.name || '').trim();
   if (!itemId) throw new ApiError('Item ID is required');
@@ -440,11 +447,12 @@ function actionAddInventoryItem(p) {
     sh.getRange(row, need(t, 'Selling Price') + 1).setValue(price);
     sh.getRange(row, need(t, 'Initial Stock') + 1).setValue(stock);
     SpreadsheetApp.flush();
+    logStock({ itemId: itemId, event: 'Created', change: stock, stockAfter: stock, details: 'Selling price ' + rs(price), ownerDetails: 'Cost ' + rs(cost) }, user);
     return inventoryRows(true).filter((i) => i.row === row)[0] || { row: row, itemId: itemId };
   });
 }
 
-function actionRestockItem(p) {
+function actionRestockItem(p, user) {
   const itemId = String(p.itemId || '').trim();
   const qty = num(p.qty);
   if (!itemId) throw new ApiError('Item ID is required');
@@ -457,8 +465,123 @@ function actionRestockItem(p) {
     const stockCol = need(t, 'Initial Stock');
     t.sh.getRange(r.row, stockCol + 1).setValue(num(r.v[stockCol]) + qty);
     SpreadsheetApp.flush();
-    return inventoryRows(true).filter((i) => i.row === r.row)[0];
+    const after = inventoryRows(true).filter((i) => i.row === r.row)[0];
+    logStock({ itemId: itemId, event: 'Restocked', change: qty, stockAfter: after ? after.currentStock : null }, user);
+    return after;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Stock history
+//
+// Every change to an item (created, restocked, counted, edited, photo) is appended to the Stock
+// History tab. Sales are not copied there: they already have dates on the Sales tab and are
+// merged in when the history is read. "Owner Details" holds anything about cost, which staff
+// never see.
+// ---------------------------------------------------------------------------
+
+const STOCK_HISTORY_HEADERS = ['Date', 'Time', 'Item ID', 'Event', 'Qty Change', 'Stock After', 'Details', 'Owner Details', 'By'];
+const STOCK_HISTORY_SHEET = 'Stock History';
+
+function stockHistorySheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(STOCK_HISTORY_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(STOCK_HISTORY_SHEET);
+    sh.getRange(1, 1, 1, STOCK_HISTORY_HEADERS.length).setValues([STOCK_HISTORY_HEADERS]);
+    sh.getRange(1, 1, 1, STOCK_HISTORY_HEADERS.length).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/**
+ * Appends one history line. Never throws: the change it describes is already saved, so a
+ * failure here must not turn a successful restock into an error.
+ * e: { itemId, event, change?, stockAfter?, details?, ownerDetails? }
+ */
+function logStock(e, user) {
+  try {
+    const sh = stockHistorySheet();
+    const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    const now = new Date();
+    const row = Math.max(sh.getLastRow(), 1) + 1;
+    sh.getRange(row, 2, 1, 2).setNumberFormat('@'); // keep the time and the Item ID as typed
+    sh.getRange(row, 1, 1, STOCK_HISTORY_HEADERS.length).setValues([
+      [
+        Utilities.formatDate(now, tz, 'yyyy-MM-dd'),
+        Utilities.formatDate(now, tz, 'HH:mm'),
+        String(e.itemId),
+        e.event,
+        e.change === undefined || e.change === null ? '' : e.change,
+        e.stockAfter === undefined || e.stockAfter === null ? '' : e.stockAfter,
+        e.details || '',
+        e.ownerDetails || '',
+        user && user.username ? user.username : '',
+      ],
+    ]);
+  } catch (err) {
+    console.error('Stock history not written: ' + err);
+  }
+}
+
+function stockHistoryRows(itemId) {
+  stockHistorySheet();
+  const t = readTable(STOCK_HISTORY_SHEET, 'Item ID');
+  const c = t.col;
+  return t.rows
+    .filter((r) => String(r.v[c['Item ID']]).trim() === itemId)
+    .map((r) => ({
+      row: r.row,
+      date: ymd(r.v[c['Date']]) || String(r.d[c['Date']]),
+      time: String(r.d[c['Time']] || ''),
+      event: String(r.v[c['Event']] || ''),
+      change: r.v[c['Qty Change']] === '' ? null : num(r.v[c['Qty Change']]),
+      stockAfter: r.v[c['Stock After']] === '' ? null : num(r.v[c['Stock After']]),
+      details: String(r.v[c['Details']] || ''),
+      ownerDetails: String(r.v[c['Owner Details']] || ''),
+      by: String(r.v[c['By']] || ''),
+    }));
+}
+
+/**
+ * params: { itemId }
+ * The item, its logged changes (oldest first) and every sale of it, each sale with all the lines
+ * of its invoice so the app can open the invoice. `openingStock` is stock the log can't explain
+ * (added before history was kept); the app shows it as the starting point.
+ */
+function actionGetItemHistory(p, user) {
+  const itemId = String(p.itemId || '').trim();
+  const owner = canSeeCosts(user);
+  const item = inventoryRows(owner).find((i) => i.itemId === itemId);
+  if (!item) throw new ApiError('Item not found: ' + itemId, 'NOT_FOUND');
+
+  const events = stockHistoryRows(itemId).map((e) => {
+    const out = { date: e.date, time: e.time, event: e.event, change: e.change, stockAfter: e.stockAfter, details: e.details, by: e.by };
+    if (owner && e.ownerDetails) out.ownerDetails = e.ownerDetails;
+    return out;
+  });
+
+  // Join sale lines into invoices the same way the app does: consecutive rows, same date and customer.
+  const all = salesRows().sort((a, b) => a.row - b.row);
+  const groups = [];
+  all.forEach((s, i) => {
+    const prev = all[i - 1];
+    const same = prev && s.row === prev.row + 1 && s.dateYmd === prev.dateYmd && s.customerName === prev.customerName && s.contact === prev.contact;
+    if (same) groups[groups.length - 1].push(s);
+    else groups.push([s]);
+  });
+  const strip = (s) => {
+    const o = Object.assign({}, s);
+    o.date = s.dateYmd;
+    delete o.dateYmd;
+    if (!owner) delete o.unitCost;
+    return o;
+  };
+  const invoices = groups.filter((g) => g.some((s) => s.itemId === itemId)).map((g) => g.map(strip));
+
+  const logged = events.reduce((sum, e) => sum + (e.change || 0), 0);
+  return { item: item, events: events, invoices: invoices, openingStock: Math.max(0, item.initialStock - logged) };
 }
 
 // ---------------------------------------------------------------------------
@@ -984,7 +1107,7 @@ function snapshotSalePrices() {
  * params: { itemId, category?, name?, size?, color?, costPrice?, sellingPrice?, stock? }
  * The Item ID cannot change: sales point at it. `stock` is the counted number on hand now.
  */
-function actionUpdateInventoryItem(p) {
+function actionUpdateInventoryItem(p, user) {
   const itemId = String(p.itemId || '').trim();
   if (!itemId) throw new ApiError('Item ID is required');
   const has = (k) => p[k] !== undefined && p[k] !== null;
@@ -1044,7 +1167,25 @@ function actionUpdateInventoryItem(p) {
         SpreadsheetApp.flush();
       }
     }
-    return inventoryRows(true).find((i) => i.itemId === itemId);
+    const saved = inventoryRows(true).find((i) => i.itemId === itemId);
+    const changes = [];
+    const ownerChanges = [];
+    const diff = (label, a, b, fmt) => {
+      if (String(a) !== String(b)) changes.push(label + ' ' + (fmt ? fmt(a) : a || '-') + ' → ' + (fmt ? fmt(b) : b || '-'));
+    };
+    diff('Name', before.name, saved.name);
+    diff('Category', before.category, saved.category);
+    diff('Size', before.size, saved.size);
+    diff('Colour', before.color, saved.color);
+    diff('Price', before.sellingPrice, saved.sellingPrice, rs);
+    if (before.costPrice !== saved.costPrice) ownerChanges.push('Cost ' + rs(before.costPrice) + ' → ' + rs(saved.costPrice));
+    if (changes.length || ownerChanges.length) {
+      logStock({ itemId: itemId, event: 'Edited', details: changes.join(' · '), ownerDetails: ownerChanges.join(' · ') }, user);
+    }
+    if (saved.currentStock !== before.currentStock) {
+      logStock({ itemId: itemId, event: 'Stock count', change: saved.currentStock - before.currentStock, stockAfter: saved.currentStock, details: 'Counted ' + saved.currentStock + ' (was ' + before.currentStock + ')' }, user);
+    }
+    return saved;
   });
 }
 
@@ -1141,6 +1282,7 @@ function actionSetItemPhoto(p, user) {
     SpreadsheetApp.flush();
     if (old) trashItemPhotoIfUnused(old.photoId);
     SpreadsheetApp.flush();
+    logStock({ itemId: item.itemId, event: old && old.photoId ? 'Photo changed' : 'Photo added' }, user);
     return { name: item.name, color: item.color, photoId: file.getId(), thumb: thumb };
   });
 }
@@ -1151,7 +1293,7 @@ function trashItemPhotoIfUnused(photoId) {
 }
 
 /** params: { itemId }. Removes the photo for that product and colour (all sizes). */
-function actionRemoveItemPhoto(p) {
+function actionRemoveItemPhoto(p, user) {
   return withLock(() => {
     const item = requireItem(p.itemId);
     const key = itemPhotoKey(item.name, item.color);
@@ -1163,6 +1305,7 @@ function actionRemoveItemPhoto(p) {
     SpreadsheetApp.flush();
     trashItemPhotoIfUnused(old.photoId);
     SpreadsheetApp.flush();
+    logStock({ itemId: item.itemId, event: 'Photo removed' }, user);
     return { removed: true };
   });
 }
@@ -1327,9 +1470,17 @@ function ledgerSheet() {
 }
 
 /** A sheet date cell (Date object or text) as YYYY-MM-DD. */
+/**
+ * A sheet date as YYYY-MM-DD. Handles real dates, text, and plain numbers formatted to look like
+ * dates (Sheets then returns the day number, e.g. 46349 for 2026-11-23).
+ */
 function ymd(v) {
   if (Object.prototype.toString.call(v) === '[object Date]') {
     return Utilities.formatDate(v, SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+  }
+  if (typeof v === 'number' && v > 20000 && v < 80000) {
+    // Sheets counts days from 30 Dec 1899.
+    return new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000).toISOString().slice(0, 10);
   }
   return String(v || '').trim().slice(0, 10);
 }
@@ -1492,7 +1643,7 @@ function actionSaveOpeningBalances(p, user) {
  * Sets each item's stock to the counted quantity. Old sales rows are kept: Initial Stock
  * becomes counted + units already sold, so Current Stock equals the count.
  */
-function actionSetStockCounts(p) {
+function actionSetStockCounts(p, user) {
   const counts = Array.isArray(p.counts) ? p.counts : [];
   if (!counts.length) throw new ApiError('Enter at least one count');
   counts.forEach((x, n) => {
@@ -1508,12 +1659,19 @@ function actionSetStockCounts(p) {
       const id = String(x.itemId || '').trim();
       const r = t.rows.filter((row) => String(row.v[idCol]).trim() === id)[0];
       if (!r) throw new ApiError('Item not found: ' + id);
-      return { r: r, value: num(x.qty) + num(r.v[soldCol]) };
+      return { r: r, id: id, value: num(x.qty) + num(r.v[soldCol]), was: num(r.v[stockCol]) - num(r.v[soldCol]) };
     });
     plan.forEach((x) => t.sh.getRange(x.r.row, stockCol + 1).setValue(x.value));
     SpreadsheetApp.flush();
     const rows = plan.map((x) => x.r.row);
-    return inventoryRows(true).filter((i) => rows.indexOf(i.row) !== -1);
+    const saved = inventoryRows(true).filter((i) => rows.indexOf(i.row) !== -1);
+    plan.forEach((x) => {
+      const now = saved.find((i) => i.row === x.r.row);
+      if (now && now.currentStock !== x.was) {
+        logStock({ itemId: x.id, event: 'Stock count', change: now.currentStock - x.was, stockAfter: now.currentStock, details: 'Counted ' + now.currentStock + ' (was ' + x.was + ')' }, user);
+      }
+    });
+    return saved;
   });
 }
 

@@ -478,3 +478,66 @@ test('updateInventoryItem: renaming one size copies the shared photo, and the fi
   t.call({ action: 'removeItemPhoto', token: t.owner, itemId: 'TOP-001-L-BLK' });
   assert.equal(t.ctx.DriveApp.files[photo.photoId].trashed, true);
 });
+
+test('item history: create, restock, edit, count and sales show up in order, costs only for owners', () => {
+  const t = setup();
+  let r = t.call({ action: 'addInventoryItem', token: t.owner, itemId: 'SK-1', category: 'Skirt', name: 'Pleated Skirt', size: 'M', color: 'Navy', costPrice: 900, sellingPrice: 1600, initialStock: 3 });
+  assert.equal(r.ok, true, r.error);
+  assert.equal(t.call({ action: 'restockItem', token: t.owner, itemId: 'SK-1', qty: 4 }).ok, true);
+  r = t.call({ action: 'updateInventoryItem', token: t.owner, itemId: 'SK-1', category: 'Skirt', name: 'Pleated Skirt', size: 'M', color: 'Navy', costPrice: 950, sellingPrice: 1600 });
+  assert.equal(r.ok, true, r.error);
+  r = t.call({ action: 'recordSale', token: t.staff, customerName: 'Mala', amountPaid: 1600, items: [{ itemId: 'TOP-001-M-BLK', qty: 1 }, { itemId: 'SK-1', qty: 2 }] });
+  assert.equal(r.ok, true, r.error);
+  r = t.call({ action: 'setStockCounts', token: t.owner, counts: [{ itemId: 'SK-1', qty: 6 }] });
+  assert.equal(r.ok, true, r.error);
+
+  const h = t.call({ action: 'getItemHistory', token: t.owner, itemId: 'SK-1' });
+  assert.equal(h.ok, true, h.error);
+  const d = h.data;
+  assert.deepEqual(d.events.map((e) => [e.event, e.change, e.stockAfter]), [
+    ['Created', 3, 3],
+    ['Restocked', 4, 7],
+    ['Edited', null, null],
+    ['Stock count', 1, 6], // 7 - 2 sold = 5, counted 6
+  ]);
+  assert.match(d.events[0].details, /Selling price Rs 1,600.00/);
+  assert.equal(d.events[0].ownerDetails, 'Cost Rs 900.00');
+  assert.equal(d.events[2].ownerDetails, 'Cost Rs 900.00 → Rs 950.00');
+  assert.match(d.events[1].time, /^\d\d:\d\d$/);
+  assert.equal(d.events[0].by, 'asanka');
+  assert.equal(d.openingStock, 0); // everything is explained by the log
+  // The sale is returned as its whole invoice (both lines), so the app can open it.
+  assert.equal(d.invoices.length, 1);
+  assert.deepEqual(d.invoices[0].map((s) => s.itemId), ['TOP-001-M-BLK', 'SK-1']);
+
+  const staff = t.call({ action: 'getItemHistory', token: t.staff, itemId: 'SK-1' }).data;
+  assert.equal(staff.events[0].ownerDetails, undefined);
+  assert.equal(staff.item.costPrice, undefined);
+  assert.equal(staff.invoices[0][1].unitCost, undefined);
+});
+
+test('item history: older items start from an opening stock, and logging never breaks a restock', () => {
+  const t = setup();
+  // TOP-001-M-BLK came from the sheet with 20 in stock and no history.
+  let h = t.call({ action: 'getItemHistory', token: t.owner, itemId: 'TOP-001-M-BLK' }).data;
+  assert.equal(h.events.length, 0);
+  assert.equal(h.openingStock, 20);
+  assert.equal(h.invoices.length, 1); // the sale already in the sheet
+  assert.equal(t.call({ action: 'restockItem', token: t.owner, itemId: 'TOP-001-M-BLK', qty: 5 }).ok, true);
+  h = t.call({ action: 'getItemHistory', token: t.owner, itemId: 'TOP-001-M-BLK' }).data;
+  assert.equal(h.openingStock, 20);
+  assert.equal(h.events[0].change, 5);
+
+  // A broken history tab must not fail the restock itself.
+  t.S['Stock History'].set = () => { throw new Error('sheet is full'); };
+  const r = t.call({ action: 'restockItem', token: t.owner, itemId: 'TOP-001-M-BLK', qty: 1 });
+  assert.equal(r.ok, true, r.error);
+  assert.equal(t.call({ action: 'getItemHistory', token: t.owner, itemId: 'NOPE' }).code, 'NOT_FOUND');
+});
+
+test('sale dates stored as day numbers (a date format on a number) still read as dates', () => {
+  const t = setup();
+  t.S.Sales.set(2, 1, 46349); // what the live sheet holds for 2026-11-23
+  const h = t.call({ action: 'getItemHistory', token: t.owner, itemId: 'TOP-001-M-BLK' }).data;
+  assert.equal(h.invoices[0][0].date, '2026-11-23');
+});

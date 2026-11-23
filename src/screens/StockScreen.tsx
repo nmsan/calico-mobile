@@ -130,17 +130,15 @@ export default function StockScreen() {
           const low = isLow(item);
           return (
             <Pressable
-              onPress={
-                isOwner
-                  ? () => {
-                      tap();
-                      setRestocking(item);
-                    }
-                  : undefined
-              }
-              accessibilityRole={isOwner ? 'button' : undefined}
-              accessibilityHint={isOwner ? 'Restock this item' : undefined}
-              style={({ pressed }) => [groupRow(index, items.length), { gap: 12 }, pressed && isOwner && { backgroundColor: colors.pressed }]}
+              onPress={() => {
+                tap();
+                // Owners get the restock sheet (with History and Edit in it); staff go straight to the history.
+                if (isOwner) setRestocking(item);
+                else nav.navigate('ItemHistory', { item });
+              }}
+              accessibilityRole="button"
+              accessibilityHint={isOwner ? 'Restock this item' : 'Shows the item history'}
+              style={({ pressed }) => [groupRow(index, items.length), { gap: 12 }, pressed && { backgroundColor: colors.pressed }]}
             >
               <ItemThumb
                 thumb={thumbOf(item.name, item.color)}
@@ -176,6 +174,10 @@ export default function StockScreen() {
           setRestocking(null);
           nav.navigate('EditItem', { item, pricesLocked: item.unitsSold > 0 && !data?.salePricesSaved });
         }}
+        onHistory={(item) => {
+          setRestocking(null);
+          nav.navigate('ItemHistory', { item });
+        }}
         onClose={() => setRestocking(null)}
         onDone={(updated) => {
           // Show the new count straight away, then refetch to pick up anything else that changed.
@@ -191,12 +193,14 @@ function RestockSheet({
   item,
   thumb,
   onEdit,
+  onHistory,
   onClose,
   onDone,
 }: {
   item: InventoryItem | null;
   thumb?: Thumb;
   onEdit: (item: InventoryItem) => void;
+  onHistory: (item: InventoryItem) => void;
   onClose: () => void;
   onDone: (updated: InventoryItem) => void;
 }) {
@@ -281,16 +285,28 @@ function RestockSheet({
         />
         <View style={{ flex: 1, gap: 8, alignItems: 'flex-start' }}>
           <Text style={[ui.muted, { fontSize: 13 }]}>{thumb ? 'Tap the photo to change it. Every size in this colour shares it.' : 'Add a photo so staff can spot this piece at a glance.'}</Text>
-          <LinkButton
-            title="Edit details"
-            icon="create-outline"
-            onPress={() => {
-              if (!item) return;
-              setQty('');
-              setError(null);
-              onEdit(item);
-            }}
-          />
+          <View style={{ flexDirection: 'row', gap: 18 }}>
+            <LinkButton
+              title="Edit details"
+              icon="create-outline"
+              onPress={() => {
+                if (!item) return;
+                setQty('');
+                setError(null);
+                onEdit(item);
+              }}
+            />
+            <LinkButton
+              title="History"
+              icon="time-outline"
+              onPress={() => {
+                if (!item) return;
+                setQty('');
+                setError(null);
+                onHistory(item);
+              }}
+            />
+          </View>
         </View>
       </View>
       <Input label="Units received" value={qty} onChangeText={setQty} keyboardType="number-pad" large placeholder="0" />

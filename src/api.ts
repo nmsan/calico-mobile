@@ -3,6 +3,7 @@ import type {
   Dashboard,
   Expense,
   InventoryItem,
+  ItemHistory,
   Meta,
   OpeningBalances,
   OpeningInput,
@@ -97,6 +98,7 @@ export const api = {
     stock: number;
   }) => call<InventoryItem>('updateInventoryItem', item),
   restock: (itemId: string, qty: number) => call<InventoryItem>('restockItem', { itemId, qty }),
+  itemHistory: (itemId: string) => call<ItemHistory>('getItemHistory', { itemId }),
 
   recordSale: (sale: { date?: string; customerName: string; contact: string; amountPaid: number; items: SaleLineInput[] }) =>
     call<RecordSaleResult>('recordSale', sale),
