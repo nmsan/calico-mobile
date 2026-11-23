@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
+import { useNavigation } from '@react-navigation/native';
 import React, { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Pressable, ScrollView, Text, View } from 'react-native';
 import { api } from '../api';
@@ -38,8 +39,10 @@ type PayMode = 'full' | 'part' | 'credit';
 type Buyer = { name: string; contact: string; isNew: boolean; owes: number };
 const DAY_OPTIONS = ['Today', 'Yesterday', 'Other'];
 
+/** New sale form, opened from the Sales tab's + button or Home's Sale shortcut. Goes back to the list once saved. */
 export default function SellScreen() {
   const toast = useToast();
+  const nav = useNavigation();
   const headerHeight = useHeaderHeight();
   const inv = useLoader(() => api.inventory());
   const thumbOf = useItemThumbs();
@@ -120,8 +123,7 @@ export default function SellScreen() {
       success();
       toast(res.balance > 0 ? `Sale saved. ${buyer.name} owes ${money(res.balance)}.` : `Sale saved. ${money(res.total)} paid.`);
       reset();
-      void inv.reload();
-      void cust.reload();
+      nav.goBack(); // the list reloads on focus and shows this sale at the top
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

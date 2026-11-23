@@ -72,7 +72,7 @@ export default function HomeScreen() {
         <View style={{ flexDirection: 'row', gap: 6 }}>
           {isOwner ? <HeaderAction icon="receipt-outline" label="Expense" onPress={() => setAddingExpense(true)} /> : null}
           <HeaderAction icon="person-outline" label="Customer" onPress={() => setAddingCustomer(true)} />
-          <HeaderAction icon="bag-handle-outline" label="Sale" filled onPress={() => nav.navigate('Sell')} />
+          <HeaderAction icon="bag-handle-outline" label="Sale" filled onPress={() => nav.navigate('Sales', { screen: 'NewSale', initial: false })} />
         </View>
       ),
       headerRightContainerStyle: { paddingRight: 12 },

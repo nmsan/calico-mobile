@@ -15,15 +15,20 @@ import MoreScreen from './screens/MoreScreen';
 import OpeningSetupScreen from './screens/OpeningSetupScreen';
 import OwnersScreen from './screens/OwnersScreen';
 import ReportsScreen from './screens/ReportsScreen';
+import SaleDetailScreen from './screens/SaleDetailScreen';
+import SalesScreen from './screens/SalesScreen';
 import SellScreen from './screens/SellScreen';
 import StockScreen from './screens/StockScreen';
 import { colors, fonts } from './theme';
+import type { Invoice } from './invoices';
 import { canManage, type InventoryItem } from './types';
 import { tap } from './ui';
 
 /** EditItem reuses the New item form. `pricesLocked`: the item has sales and old sales still look up its price. */
 export type StockStackParams = { StockList: undefined; AddItem: undefined; EditItem: { item: InventoryItem; pricesLocked: boolean } };
 export type CustomersStackParams = { CustomerList: undefined; CustomerDetail: { name: string; contact: string; photoId?: string } };
+/** SaleDetail shows one sale as an invoice. */
+export type SalesStackParams = { SalesList: undefined; NewSale: undefined; SaleDetail: { invoice: Invoice; photoId?: string } };
 export type MoreStackParams = { MoreHome: undefined; Expenses: undefined; Reports: undefined; Owners: undefined; OpeningSetup: undefined };
 /** Reports, Owners & cash and Opening balances now live in the More stack. */
 export type ReportsStackParams = MoreStackParams;
@@ -49,6 +54,17 @@ function StockNav() {
       <StockStack.Screen name="AddItem" component={AddItemScreen} options={{ title: 'New item', ...detailHeader }} />
       <StockStack.Screen name="EditItem" component={AddItemScreen} options={{ title: 'Edit item', ...detailHeader }} />
     </StockStack.Navigator>
+  );
+}
+
+const SalesStack = createNativeStackNavigator<SalesStackParams>();
+function SalesNav() {
+  return (
+    <SalesStack.Navigator screenOptions={header}>
+      <SalesStack.Screen name="SalesList" component={SalesScreen} options={{ headerShown: false }} />
+      <SalesStack.Screen name="NewSale" component={SellScreen} options={{ title: 'New sale', ...detailHeader }} />
+      <SalesStack.Screen name="SaleDetail" component={SaleDetailScreen} options={{ title: 'Invoice', ...detailHeader }} />
+    </SalesStack.Navigator>
   );
 }
 
@@ -136,7 +152,8 @@ const Tabs = createBottomTabNavigator();
 
 /**
  * Five slots: the everyday jobs either side of Home, and More for less frequent tools
- * (expenses, reports, owners, account). Sell sits next to Home so the main job is one thumb away.
+ * (expenses, reports, owners, account). Sales sits next to Home so the main job is one thumb away:
+ * its list shows what has been sold and its + button starts a new sale.
  */
 export function MainTabs() {
   return (
@@ -156,7 +173,11 @@ export function MainTabs() {
         component={StockNav}
         options={(p) => ({ ...rootHeaderOnly('StockList')(p), tabBarIcon: icon('shirt') })}
       />
-      <Tabs.Screen name="Sell" component={SellScreen} options={{ title: 'New sale', tabBarLabel: 'Sell', tabBarIcon: icon('bag-handle') }} />
+      <Tabs.Screen
+        name="Sales"
+        component={SalesNav}
+        options={(p) => ({ ...rootHeaderOnly('SalesList')(p), tabBarIcon: icon('bag-handle') })}
+      />
       <Tabs.Screen name="Home" component={HomeScreen} options={{ title: 'Home', tabBarButton: (props) => <HomeTabButton {...props} /> }} />
       <Tabs.Screen
         name="Customers"

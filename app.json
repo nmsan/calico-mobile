@@ -43,6 +43,13 @@
           "cameraPermission": "Calico uses the camera to take a customer picture.",
           "microphonePermission": false
         }
+      ],
+      [
+        "react-native-share",
+        {
+          "android": ["com.whatsapp", "com.whatsapp.w4b"],
+          "ios": ["whatsapp"]
+        }
       ]
     ],
     "extra": {
