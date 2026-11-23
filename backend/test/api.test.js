@@ -86,6 +86,28 @@ test('recordSale blocks overselling and bad input, writes nothing on failure', (
   assert.equal(t.S.Sales.getLastRow(), before);
 });
 
+test('recordSale undoes every row if the sheet rejects a write, and says why', () => {
+  const t = setup();
+  const S = t.S.Sales;
+  const before = S.getLastRow();
+  // Like a strict validation rule: the sheet refuses the second line's payment.
+  const set = S.set.bind(S);
+  S.set = (r, c, v) => {
+    if (r === before + 2 && c === 12 && v !== '') throw new Error('The data you entered in cell L5 violates the data validation rules set on this cell.');
+    set(r, c, v);
+  };
+  const r = t.call({ action: 'recordSale', token: t.staff, customerName: 'Mala', amountPaid: 3800, items: [{ itemId: 'TOP-001-M-BLK', qty: 1 }, { itemId: '123', qty: 1 }] });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /nothing was saved.*violates the data validation/);
+  assert.equal(S.getLastRow(), before);
+  for (let c = 1; c <= 14; c++) assert.ok(S.get(before + 1, c) === '' || [5, 6, 8, 9, 11, 13, 14].includes(c), 'row left behind in column ' + c);
+  // The next sale goes into the same rows as normal.
+  S.set = set;
+  const ok = t.call({ action: 'recordSale', token: t.staff, customerName: 'Mala', amountPaid: 3800, items: [{ itemId: 'TOP-001-M-BLK', qty: 1 }, { itemId: '123', qty: 1 }] });
+  assert.equal(ok.ok, true, ok.error);
+  assert.deepEqual(ok.data.rows.map((x) => x.row), [before + 1, before + 2]);
+});
+
 test('unpaid sale shows on customer, payment is applied oldest-first', () => {
   const t = setup();
   t.call({ action: 'recordSale', token: t.staff, date: '2026-11-13', customerName: 'Mala', contact: '0701112223', amountPaid: 1000, items: [{ itemId: 'TOP-001-M-BLK', qty: 1 }] });

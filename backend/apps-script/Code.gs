@@ -547,28 +547,48 @@ function actionRecordSale(p) {
     const cPrice = t.col[SALE_COST_HEADER] === undefined ? -1 : need(t, 'Unit Selling Price');
     const cCost = t.col[SALE_COST_HEADER] === undefined ? -1 : t.col[SALE_COST_HEADER];
 
-    let row = t.nextRow;
-    const written = [];
+    // Write the Item ID exactly as stored in Inventory (number or text) so lookups match.
+    const invSh = sheet(CFG.SHEETS.INVENTORY);
+    const invIdCol = 1 + readHeaderIndex(CFG.SHEETS.INVENTORY, 'Item ID');
     lines.forEach((l) => {
-      const pay = round2(Math.min(amountPaid, l.total));
-      amountPaid = round2(amountPaid - pay);
-      sh.getRange(row, cDate + 1).setValue(date);
-      sh.getRange(row, cName + 1).setValue(customerName);
-      setText(sh, row, cContact, contact);
-      // Write the Item ID exactly as stored in Inventory (number or text) so lookups match.
-      const invIdCell = sheet(CFG.SHEETS.INVENTORY).getRange(l.item.row, 1 + readHeaderIndex(CFG.SHEETS.INVENTORY, 'Item ID')).getValue();
-      sh.getRange(row, cItem + 1).setValue(invIdCell);
-      sh.getRange(row, cQty + 1).setValue(l.qty);
-      sh.getRange(row, cDisc + 1).setValue(l.discount);
-      sh.getRange(row, cPaid + 1).setValue(pay);
-      if (cPrice !== -1) {
-        sh.getRange(row, cPrice + 1).setValue(l.item.sellingPrice);
-        sh.getRange(row, cCost + 1).setValue(num(l.item.costPrice));
-      }
-      written.push(row);
-      row++;
+      l.idCell = invSh.getRange(l.item.row, invIdCol).getValue();
+      l.pay = round2(Math.min(amountPaid, l.total));
+      amountPaid = round2(amountPaid - l.pay);
     });
-    SpreadsheetApp.flush();
+
+    const first = t.nextRow;
+    const written = lines.map((_, i) => first + i);
+    // The sheet has strict validation (discount <= subtotal, paid <= total) that reads the formula
+    // columns. So write the item, quantity and price first, let the sheet work out the totals, then write
+    // the discount and payment. If the sheet rejects anything, undo every row of this sale so a
+    // half-written sale never stays behind, and pass on the sheet's own message.
+    try {
+      lines.forEach((l, i) => {
+        const row = first + i;
+        sh.getRange(row, cContact + 1).setNumberFormat('@'); // keep a phone's leading zero
+        sh.getRange(row, cDate + 1).setValue(date);
+        sh.getRange(row, cName + 1).setValue(customerName);
+        sh.getRange(row, cContact + 1).setValue(contact);
+        sh.getRange(row, cItem + 1).setValue(l.idCell);
+        sh.getRange(row, cQty + 1).setValue(l.qty);
+        if (cPrice !== -1) {
+          sh.getRange(row, cPrice + 1).setValue(l.item.sellingPrice);
+          sh.getRange(row, cCost + 1).setValue(num(l.item.costPrice));
+        }
+      });
+      SpreadsheetApp.flush();
+      lines.forEach((l, i) => {
+        const row = first + i;
+        sh.getRange(row, cDisc + 1).setValue(l.discount);
+        sh.getRange(row, cPaid + 1).setValue(l.pay);
+      });
+      SpreadsheetApp.flush();
+    } catch (e) {
+      const cols = [cDate, cName, cContact, cItem, cQty, cDisc, cPaid].concat(cPrice !== -1 ? [cPrice, cCost] : []);
+      written.forEach((row) => cols.forEach((c) => sh.getRange(row, c + 1).clearContent()));
+      SpreadsheetApp.flush();
+      throw new ApiError('The sheet would not save this sale, so nothing was saved. ' + (e && e.message ? e.message : String(e)));
+    }
 
     const saved = salesRows().filter((s) => written.indexOf(s.row) !== -1);
     return {

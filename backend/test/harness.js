@@ -41,6 +41,7 @@ class Range {
   setNumberFormat(f) { this.sh.formats[this.r + ',' + this.c] = f; return this; }
   setFormula(f) { this.sh.formulas = this.sh.formulas || {}; this.sh.formulas[this.r + ',' + this.c] = f; return this; }
   setFontWeight() { return this; }
+  clearContent() { for (let i = 0; i < this.nr; i++) for (let j = 0; j < this.nc; j++) this.sh.set(this.r + i, this.c + j, ''); return this; }
 }
 
 function buildSheets() {
